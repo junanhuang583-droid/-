@@ -19,13 +19,15 @@ import "./styles.css";
 const parsedCards = parseMinionCardsFromRecord(cardRecord);
 const cards: MinionCardDefinition[] = parsedCards.map((card) => card);
 const catalog = createCatalog(cards);
-const root = document.querySelector<HTMLDivElement>("#app");
-if (!root) throw new Error("缺少 #app 根节点");
+const appRoot = document.querySelector<HTMLDivElement>("#app");
+if (!appRoot) throw new Error("缺少 #app 根节点");
+const root: HTMLDivElement = appRoot;
 
-let session: BasicGameSession = loadSavedSession() ?? createBasicGame(cards);
+const restoredSession = loadSavedSession();
+let session: BasicGameSession = restoredSession ?? createBasicGame(cards);
 let selectedHandIndex: number | null = null;
 let selectedAttackerId: string | null = null;
-let notice = loadSavedSession() ? "已恢复上次未结束的对局。" : "已创建新对局并自动保存。";
+let notice = restoredSession ? "已恢复上次未结束的对局。" : "已创建新对局并自动保存。";
 saveSession(session);
 installPersistenceGuards(() => session);
 
@@ -47,7 +49,6 @@ function render(): void {
   const active = state.activePlayer;
   const opponent = otherPlayer(active);
   const activeState = state.players[active];
-  const opponentState = state.players[opponent];
 
   root.innerHTML = `
     <main class="app-shell">
