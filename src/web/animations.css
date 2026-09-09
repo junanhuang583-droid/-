@@ -1,0 +1,126 @@
+.deck-stack {
+  position: relative;
+  width: clamp(42px, 5vw, 64px);
+  aspect-ratio: 0.72;
+  margin: 2px 0 4px;
+  filter: drop-shadow(0 8px 12px rgba(0,0,0,.28));
+}
+
+.deck-card {
+  position: absolute;
+  inset: 0;
+  border-radius: 7px;
+  border: 1px solid #8e6e45;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(213,166,92,.20), transparent 30%),
+    linear-gradient(145deg, #3a2c20, #171513 72%);
+}
+.deck-card::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(207,164,98,.36);
+  border-radius: 5px;
+}
+.deck-card-back { transform: translate(5px, -5px) rotate(3deg); opacity: .46; }
+.deck-card-mid { transform: translate(3px, -3px) rotate(1.5deg); opacity: .72; }
+.deck-card-front {
+  display: grid;
+  place-items: center;
+  color: rgba(229,193,135,.72);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(9px, 1vw, 13px);
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+.flying-card-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 46;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.flying-card {
+  position: fixed;
+  display: grid;
+  place-items: center;
+  border: 1px solid #b18a55;
+  border-radius: 6px;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(232,187,111,.24), transparent 29%),
+    linear-gradient(145deg, #4b3524, #181513 72%);
+  color: rgba(244,213,160,.82);
+  box-shadow: 0 8px 18px rgba(0,0,0,.46), inset 0 0 0 2px rgba(92,63,38,.52);
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+.flying-card::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border: 1px solid rgba(230,190,126,.32);
+  border-radius: 4px;
+}
+.flying-card span {
+  position: relative;
+  z-index: 1;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+
+.opening-deal-shield {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  pointer-events: all;
+  background: radial-gradient(circle at 50% 50%, rgba(65,46,29,.18), rgba(8,7,6,.48) 70%);
+  backdrop-filter: blur(1.5px);
+}
+
+.deal-status {
+  min-width: 150px;
+  padding: 10px 14px;
+  border: 1px solid rgba(162,123,73,.58);
+  border-radius: 14px;
+  background: rgba(27,22,18,.86);
+  box-shadow: 0 16px 44px rgba(0,0,0,.34);
+  display: grid;
+  gap: 2px;
+  text-align: center;
+}
+.deal-status > span { color: #9d8870; font-size: 8px; letter-spacing: .12em; }
+.deal-status strong { color: #f0dcc0; font-family: Georgia, "Times New Roman", serif; font-size: 17px; }
+.deal-status small { color: #c9a96a; font-size: 9px; }
+
+.opening-deal .hand-card {
+  opacity: 0;
+  transform: translateY(18px) scale(.92);
+}
+
+.newly-drawn-hidden {
+  opacity: 0 !important;
+  transform: translateY(14px) scale(.9) !important;
+  pointer-events: none;
+}
+
+.draw-animating .hand-row {
+  overflow: hidden;
+}
+
+@media (orientation: landscape) and (max-height: 460px) {
+  .deck-stack { width: 34px; margin-bottom: 1px; }
+  .deck-card { border-radius: 5px; }
+  .deal-status { min-width: 132px; padding: 7px 10px; border-radius: 11px; }
+  .deal-status strong { font-size: 14px; }
+  .deal-status small { font-size: 7px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hand-card, .board-slot, .hero-panel { transition: none !important; }
+}
