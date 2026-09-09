@@ -29,11 +29,14 @@ const KEYWORD_MAP: Record<string, Keyword> = {
 export function parseMinionCardsFromRecord(markdown: string): ParsedMinionCard[] {
   const matches = [...markdown.matchAll(/^(#{3,4})\s+([CT]\d{3})\s+(.+)$/gm)];
 
-  return matches.map((match, index) => {
+  return matches.map((match) => {
+    const headingLevel = match[1]!.length;
     const id = match[2] as `C${string}` | `T${string}`;
     const name = match[3]!.trim();
     const blockStart = (match.index ?? 0) + match[0].length;
-    const blockEnd = matches[index + 1]?.index ?? markdown.length;
+    const tail = markdown.slice(blockStart);
+    const nextHeading = tail.search(new RegExp(`^#{1,${headingLevel}}\\s+`, "m"));
+    const blockEnd = nextHeading >= 0 ? blockStart + nextHeading : markdown.length;
     const rawText = markdown.slice(blockStart, blockEnd).trim();
 
     const attributes = parseAttributes(rawText);
