@@ -27,7 +27,7 @@ const restoredSession = loadSavedSession();
 let session: BasicGameSession = restoredSession ?? createBasicGame(cards);
 let selectedHandIndex: number | null = null;
 let selectedAttackerId: string | null = null;
-let notice = restoredSession ? "已恢复上次未结束的对局。" : "已创建新对局并自动保存。";
+let notice = restoredSession ? "已恢复上次对局。" : "已创建新对局并自动保存。";
 saveSession(session);
 installPersistenceGuards(() => session);
 
@@ -38,7 +38,7 @@ window.addEventListener("storage", (event) => {
   session = latest;
   selectedHandIndex = null;
   selectedAttackerId = null;
-  notice = "检测到另一个标签页的更新，已同步。";
+  notice = "另一个标签页有更新，已同步。";
   render();
 });
 
@@ -51,11 +51,11 @@ function render(): void {
   const activeState = state.players[active];
 
   root.innerHTML = `
-    <main class="app-shell">
-      <header class="topbar">
-        <div>
-          <div class="eyebrow">浏览器基础验收版</div>
-          <h1>炉石制造</h1>
+    <main class="game-shell">
+      <header class="game-topbar">
+        <div class="brand-block">
+          <strong>Card Game</strong>
+          <span>基础验收版</span>
         </div>
         <div class="top-stats">
           <span>第 ${state.turn} 回合</span>
@@ -64,53 +64,61 @@ function render(): void {
         </div>
       </header>
 
-      <section class="notice ${notice ? "show" : ""}">${escapeHtml(notice)}</section>
-      <section class="mode-note">
-        当前仅执行基础规则。所有随从特殊效果、关键词、召唤条件、进化、装备和场景暂不生效；牌面文字只展示，不参与结算。
-      </section>
+      <section class="status-toast ${notice ? "show" : ""}">${escapeHtml(notice)}</section>
 
-      ${playerPanel(opponent, false)}
+      <section class="battle-shell">
+        ${heroPanel(opponent, false)}
+        ${boardZone(opponent, false)}
 
-      <section class="battlefield-divider">
-        <button id="attack-hero" class="hero-target" ${selectedAttackerId ? "" : "disabled"}>
-          ${selectedAttackerId ? `攻击${playerLabel(opponent)}英雄` : "先选择可攻击随从"}
-        </button>
-      </section>
-
-      ${playerPanel(active, true)}
-
-      <section class="hand-panel">
-        <div class="section-heading">
-          <div>
-            <span>${playerLabel(active)}手牌</span>
-            <small>${activeState.hand.length} 张</small>
+        <section class="scene-lane">
+          <div class="scene-placeholder">
+            <span>场景区</span>
+            <small>${selectedAttackerId ? `已选择攻击者，点击敌方随从或${playerLabel(opponent)}英雄` : "战场中央 / 场景牌以后显示在这里"}</small>
           </div>
-          <button id="end-turn" class="primary-button" ${state.winner ? "disabled" : ""}>结束回合</button>
+        </section>
+
+        ${heroPanel(active, true)}
+        ${boardZone(active, true)}
+
+        <aside class="battle-rail">
+          <div class="rail-group">
+            <span class="rail-label">牌局</span>
+            <strong>牌库 ${state.sharedDeck.length}</strong>
+            <small>P1 弃牌 ${state.players.P1.discardPile.length}</small>
+            <small>P2 弃牌 ${state.players.P2.discardPile.length}</small>
+          </div>
+          <div class="rail-actions">
+            <button id="end-turn" class="primary-button turn-button" ${state.winner ? "disabled" : ""}>结束回合</button>
+            <button class="secondary-button" data-new-game="confirm">新对局</button>
+          </div>
+        </aside>
+      </section>
+
+      <section class="hand-dock">
+        <div class="hand-heading">
+          <strong>${playerLabel(active)}手牌</strong>
+          <span>${activeState.hand.length} 张</span>
+          <small>点手牌 → 点己方空位召唤　｜　点己方随从 → 点敌方目标攻击</small>
         </div>
         <div class="hand-row">
           ${activeState.hand.map((cardId, index) => handCard(cardId, index)).join("") || `<div class="empty-state">暂无手牌</div>`}
         </div>
-        <div class="hint">召唤：先点一张手牌，再点己方空随从位。攻击：先点己方可攻击随从，再点敌方随从或英雄。</div>
       </section>
 
-      <section class="lower-grid">
-        <article class="log-panel">
-          <div class="section-heading"><span>对局记录</span><small>最多保留最近 300 条</small></div>
+      <details class="debug-drawer">
+        <summary>测试信息</summary>
+        <div class="debug-content">
+          <div class="mode-note">当前仅执行基础规则。随从特殊效果、关键词、召唤条件、进化、装备和场景暂不结算。</div>
+          <div class="debug-stats">
+            <span>可运行牌库 ${catalog.playableDeckSize}</span>
+            <span>死亡记录 ${state.deathLog.length}</span>
+            <span>保存 ${formatTime(session.updatedAt)}</span>
+          </div>
           <div class="log-list">
             ${session.log.slice().reverse().map((entry) => `<div class="log-entry"><span>R${entry.turn}</span>${escapeHtml(entry.text)}</div>`).join("")}
           </div>
-        </article>
-        <article class="info-panel">
-          <div class="section-heading"><span>原型状态</span></div>
-          <dl>
-            <div><dt>可运行牌库</dt><dd>${catalog.playableDeckSize} 张</dd></div>
-            <div><dt>弃牌</dt><dd>P1 ${state.players.P1.discardPile.length} / P2 ${state.players.P2.discardPile.length}</dd></div>
-            <div><dt>死亡记录</dt><dd>${state.deathLog.length}</dd></div>
-            <div><dt>保存时间</dt><dd>${formatTime(session.updatedAt)}</dd></div>
-          </dl>
-          <button id="new-game" class="danger-button">清空当前局并新开一局</button>
-        </article>
-      </section>
+        </div>
+      </details>
 
       ${session.handoffRequired && !state.winner ? handoffOverlay(active) : ""}
       ${state.winner ? winnerOverlay(state.winner) : ""}
@@ -120,22 +128,30 @@ function render(): void {
   bindEvents();
 }
 
-function playerPanel(playerId: PlayerId, isActivePanel: boolean): string {
+function heroPanel(playerId: PlayerId, isActive: boolean): string {
+  const player = session.state.players[playerId];
+  const isTarget = !isActive && selectedAttackerId !== null && !session.handoffRequired;
+  const tag = isTarget ? "button" : "div";
+  const targetAttrs = isTarget ? `data-hero-target="${playerId}"` : "";
+  return `
+    <${tag} class="hero-panel ${isActive ? "active-hero" : "opponent-hero"} ${isTarget ? "hero-target-ready" : ""}" ${targetAttrs}>
+      <div class="hero-portrait"><span>${playerId === "P1" ? "1" : "2"}</span></div>
+      <div class="hero-copy">
+        <span>${playerLabel(playerId)}</span>
+        <strong>♥ ${player.health}</strong>
+        <small>${session.state.activePlayer === playerId ? "当前回合" : "等待"} · 手牌 ${player.hand.length}</small>
+      </div>
+      <div class="equipment-slot" title="装备位将在后续版本启用">装备</div>
+    </${tag}>
+  `;
+}
+
+function boardZone(playerId: PlayerId, isActivePanel: boolean): string {
   const player = session.state.players[playerId];
   const board = player.board.map((minion, index) => boardSlot(playerId, minion, index, isActivePanel)).join("");
   return `
-    <section class="player-panel ${isActivePanel ? "active-player" : "opponent-player"}">
-      <div class="player-line">
-        <div>
-          <strong>${playerLabel(playerId)}</strong>
-          <span class="turn-badge">${session.state.activePlayer === playerId ? "当前回合" : "等待"}</span>
-        </div>
-        <div class="player-numbers">
-          <span class="health">♥ ${player.health}</span>
-          <span>手牌 ${player.hand.length}</span>
-          <span>弃牌 ${player.discardPile.length}</span>
-        </div>
-      </div>
+    <section class="board-zone ${isActivePanel ? "active-board" : "opponent-board"}">
+      <div class="board-caption"><span>${isActivePanel ? "己方随从" : "敌方随从"}</span><small>5 格</small></div>
       <div class="board-row">${board}</div>
     </section>
   `;
@@ -144,7 +160,7 @@ function playerPanel(playerId: PlayerId, isActivePanel: boolean): string {
 function boardSlot(playerId: PlayerId, minion: MinionInstance | null, slotIndex: number, isActivePanel: boolean): string {
   if (!minion) {
     const summonReady = isActivePanel && selectedHandIndex !== null && !session.handoffRequired;
-    return `<button class="board-slot empty-slot ${summonReady ? "summon-ready" : ""}" data-empty-slot="${slotIndex}" ${isActivePanel ? "" : "disabled"}><span>${slotIndex + 1}</span><small>${summonReady ? "召唤到这里" : "空位"}</small></button>`;
+    return `<button class="board-slot empty-slot ${summonReady ? "summon-ready" : ""}" data-empty-slot="${slotIndex}" ${isActivePanel ? "" : "disabled"}><span>${slotIndex + 1}</span><small>${summonReady ? "召唤" : "空位"}</small></button>`;
   }
   const card = catalog.cards.get(minion.cardId);
   const attack = Math.max(0, (card?.attack ?? 0) + minion.attackModifier);
@@ -155,6 +171,7 @@ function boardSlot(playerId: PlayerId, minion: MinionInstance | null, slotIndex:
     <button class="board-slot minion ${ready ? "attack-ready" : ""} ${selected ? "selected" : ""} ${enemyTarget ? "enemy-target" : ""}"
       data-minion-id="${escapeHtml(minion.instanceId)}" data-owner="${playerId}">
       <span class="slot-number">${slotIndex + 1}</span>
+      <div class="minion-art"><span>${escapeHtml((card?.name ?? minion.cardId).slice(0, 1))}</span></div>
       <strong>${escapeHtml(card?.name ?? minion.cardId)}</strong>
       <div class="minion-stats"><span>⚔ ${attack}</span><span>♥ ${minion.currentHealth}</span></div>
       <small>${ready ? "可攻击" : minion.summonedOnTurn === session.state.turn ? "刚上场" : "已行动"}</small>
@@ -170,10 +187,10 @@ function handCard(cardId: CardId, index: number): string {
   return `
     <button class="hand-card ${selected ? "selected" : ""}" data-hand-index="${index}" ${unusable ? "disabled" : ""}>
       <span class="card-id">${escapeHtml(card.id)}</span>
+      <div class="hand-card-art"><span>${escapeHtml(card.name.slice(0, 1))}</span></div>
       <strong>${escapeHtml(card.name)}</strong>
       <div class="card-stats"><span>⚔ ${card.attack ?? "?"}</span><span>♥ ${card.health ?? "?"}</span></div>
       <small>${escapeHtml(card.summonText ?? "直接召唤")}</small>
-      ${card.effects.length > 0 ? `<em>特殊效果暂未启用</em>` : ""}
     </button>
   `;
 }
@@ -185,7 +202,7 @@ function bindEvents(): void {
       const index = Number(element.dataset.handIndex);
       selectedHandIndex = selectedHandIndex === index ? null : index;
       selectedAttackerId = null;
-      notice = selectedHandIndex === null ? "已取消召唤选择。" : "请选择己方一个空随从位。";
+      notice = selectedHandIndex === null ? "已取消召唤选择。" : "请选择己方空随从位。";
       render();
     });
   });
@@ -196,7 +213,7 @@ function bindEvents(): void {
       const error = summonFromHand(session, catalog, selectedHandIndex, Number(element.dataset.emptySlot));
       if (!error) selectedHandIndex = null;
       selectedAttackerId = null;
-      commit(error ?? "召唤完成。特殊召唤条件和随从效果在本版中未执行。", Boolean(error));
+      commit(error ?? "召唤完成。", Boolean(error));
     });
   });
 
@@ -214,7 +231,7 @@ function bindEvents(): void {
         }
         selectedAttackerId = selectedAttackerId === instanceId ? null : instanceId;
         selectedHandIndex = null;
-        notice = selectedAttackerId ? "请选择敌方随从或敌方英雄作为目标。" : "已取消攻击选择。";
+        notice = selectedAttackerId ? "请选择敌方随从或敌方英雄。" : "已取消攻击选择。";
         render();
         return;
       }
@@ -226,7 +243,7 @@ function bindEvents(): void {
     });
   });
 
-  document.querySelector<HTMLButtonElement>("#attack-hero")?.addEventListener("click", () => {
+  document.querySelector<HTMLElement>("[data-hero-target]")?.addEventListener("click", () => {
     if (!selectedAttackerId) return;
     const error = attackHero(session, catalog, selectedAttackerId);
     selectedAttackerId = null;
@@ -238,7 +255,7 @@ function bindEvents(): void {
     const error = endTurn(session);
     selectedAttackerId = null;
     selectedHandIndex = null;
-    commit(error ?? "回合已结束，进入交接屏。", Boolean(error));
+    commit(error ?? "回合结束，进入交接。", Boolean(error));
   });
 
   document.querySelector<HTMLButtonElement>("#reveal-turn")?.addEventListener("click", () => {
@@ -246,13 +263,15 @@ function bindEvents(): void {
     commit(`${playerLabel(session.state.activePlayer)}已接手。`, false);
   });
 
-  document.querySelector<HTMLButtonElement>("#new-game")?.addEventListener("click", () => {
-    const confirmed = window.confirm("这会覆盖当前保存的对局。确定新开一局吗？");
-    if (!confirmed) return;
-    session = createBasicGame(cards);
-    selectedAttackerId = null;
-    selectedHandIndex = null;
-    commit("已创建并保存新对局。", false);
+  document.querySelectorAll<HTMLElement>("[data-new-game]").forEach((element) => {
+    element.addEventListener("click", () => {
+      const needsConfirm = element.dataset.newGame !== "instant";
+      if (needsConfirm && !window.confirm("这会覆盖当前保存的对局。确定新开一局吗？")) return;
+      session = createBasicGame(cards);
+      selectedAttackerId = null;
+      selectedHandIndex = null;
+      commit("已创建并保存新对局。", false);
+    });
   });
 }
 
@@ -265,10 +284,10 @@ function commit(message: string, isError = false, persist = true): void {
 function handoffOverlay(playerId: PlayerId): string {
   return `
     <div class="overlay">
-      <div class="overlay-card">
+      <div class="overlay-card compact-overlay">
         <div class="eyebrow">本地双人交接</div>
         <h2>轮到${playerLabel(playerId)}</h2>
-        <p>上一位玩家请把设备交给下一位。点击后才显示当前玩家手牌，避免交接时看到对方手牌。</p>
+        <p>把设备交给下一位玩家，点击后才显示当前玩家手牌。</p>
         <button id="reveal-turn" class="primary-button large">查看手牌并开始</button>
       </div>
     </div>
@@ -277,11 +296,12 @@ function handoffOverlay(playerId: PlayerId): string {
 
 function winnerOverlay(winner: PlayerId | "draw"): string {
   return `
-    <div class="overlay">
-      <div class="overlay-card">
+    <div class="overlay winner-overlay">
+      <div class="overlay-card compact-overlay">
         <div class="eyebrow">对局结束</div>
         <h2>${winner === "draw" ? "平局" : `${playerLabel(winner)}获胜`}</h2>
-        <p>本局记录已经保存在当前浏览器中。你可以关闭页面后再回来查看，也可以手动新开一局。</p>
+        <p>结束状态已自动保存。点击“再来一局”会直接覆盖当前对局存档。</p>
+        <button class="primary-button large" data-new-game="instant">再来一局</button>
       </div>
     </div>
   `;
