@@ -22,30 +22,40 @@ export interface BasicGameSession {
 export interface BasicGameCatalog {
   cards: Map<CardId, MinionCardDefinition>;
   playableDeckSize: number;
+  playableUniqueCards: number;
   skippedCardIds: CardId[];
+}
+
+/**
+ * Browser acceptance mode deliberately widens the demo pool without changing
+ * canonical card quantities. Any formal minion with known health + attack gets
+ * at least one temporary demo copy; explicitly confirmed copy counts are kept.
+ * Cards with missing combat stats stay out rather than receiving invented data.
+ */
+function demoCopies(card: MinionCardDefinition): number {
+  if (card.type !== "minion" || card.health === null || card.attack === null) return 0;
+  if (card.copies !== null && card.copies > 0) return card.copies;
+  return 1;
 }
 
 export function createCatalog(cards: MinionCardDefinition[]): BasicGameCatalog {
   const map = new Map<CardId, MinionCardDefinition>();
   let playableDeckSize = 0;
+  let playableUniqueCards = 0;
   const skippedCardIds: CardId[] = [];
 
   for (const card of cards) {
     map.set(card.id, card);
-    if (
-      card.type !== "minion" ||
-      card.copies === null ||
-      card.copies <= 0 ||
-      card.health === null ||
-      card.attack === null
-    ) {
+    const copies = demoCopies(card);
+    if (copies <= 0) {
       skippedCardIds.push(card.id);
       continue;
     }
-    playableDeckSize += card.copies;
+    playableDeckSize += copies;
+    playableUniqueCards += 1;
   }
 
-  return { cards: map, playableDeckSize, skippedCardIds };
+  return { cards: map, playableDeckSize, playableUniqueCards, skippedCardIds };
 }
 
 export function createBasicGame(
@@ -56,16 +66,8 @@ export function createBasicGame(
   const deck: CardId[] = [];
 
   for (const card of cards) {
-    if (
-      card.type !== "minion" ||
-      card.copies === null ||
-      card.copies <= 0 ||
-      card.health === null ||
-      card.attack === null
-    ) {
-      continue;
-    }
-    for (let i = 0; i < card.copies; i += 1) deck.push(card.id);
+    const copies = demoCopies(card);
+    for (let i = 0; i < copies; i += 1) deck.push(card.id);
   }
 
   shuffle(deck, random);
@@ -99,7 +101,7 @@ export function createBasicGame(
   drawCards(session, "P2", RULES_CORE_V1.startingHandSize, random);
   beginTurn(session, firstPlayer, random);
   log(session, `新对局开始，${playerName(firstPlayer)}先手。基础验收模式不执行任何随从特殊效果。`);
-  log(session, `本局共享牌库载入 ${catalog.playableDeckSize} 张可运行随从牌。`);
+  log(session, `演示牌池载入 ${catalog.playableUniqueCards} 种、共 ${catalog.playableDeckSize} 张可运行随从。未知卡牌数量只在本演示牌池临时按 1 张使用，不写回正式卡牌记录。`);
   return session;
 }
 
