@@ -163,7 +163,7 @@ export function attackMinion(
   const reason = validateAttacker(session, attacker);
   if (reason) return reason;
 
-  const attack = getAttack(attacker, catalog);
+  const attack = getAttack(attacker.minion, catalog);
   target.minion.currentHealth -= attack;
   attacker.minion.attacksUsedThisTurn += 1;
   const attackerName = cardName(attacker.minion.cardId, catalog);
@@ -191,7 +191,7 @@ export function attackHero(
   if (reason) return reason;
 
   const targetPlayerId = otherPlayer(active);
-  const damage = getAttack(attacker, catalog);
+  const damage = getAttack(attacker.minion, catalog);
   session.state.players[targetPlayerId].health -= damage;
   attacker.minion.attacksUsedThisTurn += 1;
   log(session, `${playerName(active)}的「${cardName(attacker.minion.cardId, catalog)}」直接攻击${playerName(targetPlayerId)}，造成 ${damage} 点伤害。`);
