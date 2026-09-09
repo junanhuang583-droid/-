@@ -78,4 +78,40 @@ describe("basic no-effects game", () => {
     expect(session.state.players[second].discardPile).toContain("C001");
     expect(session.state.deathLog).toHaveLength(1);
   });
+
+  it("adds one temporary demo copy for known-stat cards with unknown quantity", () => {
+    const demoCards: MinionCardDefinition[] = [
+      {
+        id: "C101",
+        name: "数量未知但可战斗",
+        type: "minion",
+        attributes: ["普通"],
+        copies: null,
+        notes: [],
+        health: 4,
+        attack: 3,
+        healing: null,
+        summonText: null,
+        effects: [],
+      },
+      {
+        id: "C102",
+        name: "数值未确认",
+        type: "minion",
+        attributes: ["普通"],
+        copies: 4,
+        notes: [],
+        health: null,
+        attack: null,
+        healing: null,
+        summonText: null,
+        effects: [],
+      },
+    ];
+
+    const catalog = createCatalog(demoCards);
+    expect(catalog.playableUniqueCards).toBe(1);
+    expect(catalog.playableDeckSize).toBe(1);
+    expect(catalog.skippedCardIds).toContain("C102");
+  });
 });
