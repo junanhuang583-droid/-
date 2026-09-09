@@ -33,7 +33,7 @@ export function parseMinionCardsFromRecord(markdown: string): ParsedMinionCard[]
     const headingLevel = match[1]!.length;
     const id = match[2] as `C${string}` | `T${string}`;
     const name = match[3]!.trim();
-    const blockStart = (match.index ?? 0) + match[0].length;
+    const blockStart = (match.index ?? 0) + match[0]!.length;
     const tail = markdown.slice(blockStart);
     const nextHeading = tail.search(new RegExp(`^#{1,${headingLevel}}\\s+`, "m"));
     const blockEnd = nextHeading >= 0 ? blockStart + nextHeading : markdown.length;
