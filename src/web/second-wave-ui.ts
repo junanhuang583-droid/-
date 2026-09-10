@@ -12,6 +12,7 @@ import type { CardId, MinionCardDefinition } from "../model/cards.js";
 import type { MinionInstance, PlayerId } from "../model/state.js";
 import { loadSavedSession, saveSession } from "./persistence.js";
 
+const SAVE_KEY = "lushizhizao.basic-game.v1";
 const cards: MinionCardDefinition[] = parseMinionCardsFromRecord(cardRecord);
 const catalog = createCatalog(cards);
 const selectedSacrifices = new Set<string>();
@@ -108,6 +109,7 @@ function renderSacrificePicker(session: BasicGameSession, card: MinionCardDefini
   overlay.querySelector<HTMLButtonElement>("#confirm-sacrifice")?.addEventListener("click", () => {
     const fresh = loadSavedSession();
     if (!fresh || !pendingSummonUi) return;
+    const summonedCard = catalog.cards.get(pendingSummonUi.cardId);
     const error = summonFromHand(
       fresh,
       catalog,
@@ -119,8 +121,11 @@ function renderSacrificePicker(session: BasicGameSession, card: MinionCardDefini
       showChoiceError(overlay, error);
       return;
     }
-    saveSession(fresh);
-    window.location.reload();
+    pendingSummonUi = null;
+    selectedSacrifices.clear();
+    removeChoiceOverlay();
+    saveAndSync(fresh);
+    showTransientMessage(summonedCard ? `已献祭并召唤「${summonedCard.name}」。` : "献祭召唤完成。");
   });
 }
 
@@ -195,10 +200,28 @@ function renderPendingEffectPicker(session: BasicGameSession): void {
         showChoiceError(overlay, error);
         return;
       }
-      saveSession(fresh);
-      window.location.reload();
+      removeChoiceOverlay();
+      saveAndSync(fresh);
+      showTransientMessage(`${label}亡语已结算。`);
     });
   });
+}
+
+function saveAndSync(session: BasicGameSession): void {
+  saveSession(session);
+  const value = localStorage.getItem(SAVE_KEY);
+  try {
+    window.dispatchEvent(new StorageEvent("storage", {
+      key: SAVE_KEY,
+      newValue: value,
+      storageArea: localStorage,
+      url: window.location.href,
+    }));
+  } catch {
+    // Older engines may not construct StorageEvent. Mutation observers still
+    // resync the auxiliary UI, while the persisted state remains correct.
+  }
+  scheduleSync();
 }
 
 function controlTargetOption(minion: MinionInstance, slotIndex: number): string {
@@ -287,12 +310,12 @@ function playerLabel(playerId: PlayerId): string {
 }
 
 function escapeHtml(value: string): string {
-  return value.replace(/[&<>'"]/g, (char) => ({
+  return value.replace(/[&<>'\"]/g, (char) => ({
     "&": "&amp;",
     "<": "&lt;",
     ">": "&gt;",
     "'": "&#39;",
-    '"': "&quot;",
+    '\"': "&quot;",
   })[char] ?? char);
 }
 
