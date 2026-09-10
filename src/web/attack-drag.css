@@ -1,10 +1,10 @@
 /* Drag-to-attack interaction. Click remains inspection; drag is combat. */
-body.attack-drag-enabled .active-board [data-minion-id]{touch-action:none;-webkit-tap-highlight-color:transparent}
-body.attack-drag-enabled .active-board [data-minion-id].attack-touching{transform:translateY(-2px) scale(1.01)!important}
-body.attack-drag-enabled .active-board [data-minion-id].attack-drag-source{opacity:.48!important;filter:saturate(.65) brightness(.78);box-shadow:0 0 0 2px rgba(237,192,104,.34),0 12px 28px rgba(0,0,0,.28)!important}
-body.attack-drag-active .opponent-board [data-minion-id]{transition:filter .1s ease,transform .1s ease,box-shadow .1s ease,opacity .1s ease!important}
-body.attack-drag-active .opponent-board [data-minion-id].attack-legal-target{filter:brightness(1.15) saturate(1.08);box-shadow:0 0 0 2px rgba(240,194,101,.64),0 0 24px rgba(240,194,101,.24)!important}
-body.attack-drag-active .opponent-board [data-minion-id].attack-blocked-target{opacity:.34!important;filter:grayscale(.35) brightness(.62)!important}
+body.attack-drag-enabled [data-minion-id]{touch-action:none;-webkit-tap-highlight-color:transparent}
+body.attack-drag-enabled [data-minion-id].attack-touching{transform:translateY(-2px) scale(1.01)!important}
+body.attack-drag-enabled [data-minion-id].attack-drag-source{opacity:.48!important;filter:saturate(.65) brightness(.78);box-shadow:0 0 0 2px rgba(237,192,104,.34),0 12px 28px rgba(0,0,0,.28)!important}
+body.attack-drag-active [data-minion-id]{transition:filter .1s ease,transform .1s ease,box-shadow .1s ease,opacity .1s ease!important}
+body.attack-drag-active [data-minion-id].attack-legal-target{filter:brightness(1.15) saturate(1.08);box-shadow:0 0 0 2px rgba(240,194,101,.64),0 0 24px rgba(240,194,101,.24)!important}
+body.attack-drag-active [data-minion-id].attack-blocked-target{opacity:.34!important;filter:grayscale(.35) brightness(.62)!important}
 body.attack-drag-active .opponent-hero.attack-legal-target{filter:brightness(1.12) drop-shadow(0 0 15px rgba(240,194,101,.36))}
 body.attack-drag-active .attack-drop-target{transform:translateY(-4px) scale(1.055)!important;box-shadow:0 0 0 3px #f0c265,0 0 34px rgba(240,194,101,.42)!important;filter:brightness(1.24) saturate(1.12)!important}
 .attack-drag-ghost{position:fixed;left:0;top:0;z-index:255;width:54px;height:54px;display:grid;place-items:center;border:2px solid rgba(233,191,105,.78);border-radius:50%;background:radial-gradient(circle at 36% 28%,#795c38,#33271c 58%,#17130f 100%);color:#f7dfaa;box-shadow:0 14px 34px rgba(0,0,0,.56),0 0 22px rgba(230,183,91,.2);pointer-events:none;will-change:transform;transform:translate3d(-500px,-500px,0)}
