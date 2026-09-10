@@ -1,0 +1,220 @@
+/* Readability-first selected-card detail view. Loaded after tabletop-ui.css. */
+
+.selected-card-preview {
+  width: clamp(248px, 32vw, 340px) !important;
+  height: min(520px, calc(100dvh - 18px)) !important;
+  max-height: calc(100dvh - 18px) !important;
+  padding: 9px !important;
+  grid-template-rows: auto clamp(72px, 20dvh, 128px) auto minmax(0, 1fr) auto auto !important;
+  gap: 6px !important;
+  overflow: hidden !important;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+}
+
+.preview-card-head {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.preview-card-head .preview-meta {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.preview-close {
+  flex: 0 0 auto;
+  width: 25px;
+  height: 25px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(160, 132, 95, .55);
+  border-radius: 50%;
+  background: rgba(17, 15, 13, .72);
+  color: #e3d4c0;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.preview-art {
+  position: relative;
+  overflow: hidden;
+}
+
+.preview-art small {
+  position: absolute;
+  right: 7px;
+  bottom: 5px;
+  color: rgba(236, 219, 196, .46);
+  font-size: 7px;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
+}
+
+.preview-title {
+  min-width: 0;
+  align-items: center !important;
+}
+
+.preview-title strong {
+  min-width: 0;
+  font-size: clamp(15px, 2.2vw, 20px) !important;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.preview-attrs {
+  flex: 0 1 46%;
+  max-width: 46% !important;
+  font-size: 8px !important;
+  line-height: 1.25;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.preview-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  scrollbar-width: thin;
+  scrollbar-color: var(--preview-accent, #b9925d) rgba(15, 13, 11, .45);
+  padding: 1px 4px 8px 1px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.preview-scroll::-webkit-scrollbar { width: 5px; }
+.preview-scroll::-webkit-scrollbar-track { background: rgba(15, 13, 11, .38); border-radius: 99px; }
+.preview-scroll::-webkit-scrollbar-thumb { background: var(--preview-accent, #b9925d); border-radius: 99px; }
+
+.preview-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.preview-facts > div {
+  min-width: 0;
+  padding: 5px 6px;
+  border: 1px solid rgba(135, 108, 75, .38);
+  border-radius: 7px;
+  background: rgba(18, 16, 14, .46);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.preview-facts span {
+  color: #938472;
+  font-size: 7px;
+}
+
+.preview-facts strong {
+  color: #e7d8c4;
+  font-size: 8px;
+  line-height: 1.25;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.preview-section {
+  border: 1px solid rgba(128, 100, 68, .38);
+  border-radius: 8px;
+  padding: 6px 7px;
+  background: rgba(18, 15, 13, .42);
+}
+
+.preview-section h4 {
+  margin: 0 0 4px;
+  color: var(--preview-accent, #ddb16d);
+  font-size: 8px;
+  letter-spacing: .04em;
+}
+
+.preview-section p {
+  margin: 0 0 4px;
+  color: #ecdec9;
+  font-size: 9px;
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.preview-section p:last-child { margin-bottom: 0; }
+
+.preview-effects {
+  min-height: initial !important;
+  overflow: visible !important;
+  display: block !important;
+  justify-content: initial !important;
+  padding: 6px 7px !important;
+  font-size: 9px !important;
+  line-height: 1.5 !important;
+}
+
+.preview-effects p { margin: 0 0 5px !important; }
+.preview-effects p:last-child { margin-bottom: 0 !important; }
+
+.preview-record {
+  background: rgba(11, 11, 10, .36);
+}
+
+.preview-record-line {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 6px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, .045);
+  font-size: 8px;
+  line-height: 1.42;
+}
+
+.preview-record-line:last-child { border-bottom: 0; }
+.preview-record-line b { color: #a9957d; }
+.preview-record-line span { color: #ded0bc; white-space: normal; overflow-wrap: anywhere; }
+
+.preview-scroll-hint {
+  text-align: center;
+  color: #8f816f;
+  font-size: 7px;
+  line-height: 1;
+  user-select: none;
+  pointer-events: none;
+}
+
+.preview-stats {
+  margin: 0 !important;
+  padding-top: 6px !important;
+  background: linear-gradient(180deg, rgba(31, 25, 20, 0), rgba(31, 25, 20, .35));
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .selected-card-preview {
+    width: clamp(250px, 36vw, 330px) !important;
+    height: calc(100dvh - 12px) !important;
+    max-height: calc(100dvh - 12px) !important;
+    padding: 7px !important;
+    gap: 4px !important;
+    grid-template-rows: auto clamp(58px, 18dvh, 82px) auto minmax(0, 1fr) auto auto !important;
+    border-radius: 12px !important;
+  }
+
+  .preview-close { width: 22px; height: 22px; font-size: 16px; }
+  .preview-title strong { font-size: 14px !important; }
+  .preview-attrs { font-size: 7px !important; }
+  .preview-facts { gap: 3px; }
+  .preview-facts > div { padding: 3px 5px; }
+  .preview-section { padding: 5px 6px; }
+  .preview-section p, .preview-effects { font-size: 8px !important; line-height: 1.38 !important; }
+  .preview-record-line { grid-template-columns: 48px minmax(0, 1fr); font-size: 7px; padding: 3px 0; }
+  .preview-stats { font-size: 13px !important; }
+}
