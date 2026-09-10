@@ -22,6 +22,7 @@
 .pwa-control-button.install-ready {
   border-color: rgba(198, 161, 94, .95);
   color: #f0d6a5;
+  box-shadow: 0 0 18px rgba(198, 161, 94, .16);
 }
 
 .pwa-toast {
@@ -48,6 +49,109 @@
 .pwa-toast.show {
   opacity: 1;
   transform: translate(-50%, 0);
+}
+
+.pwa-install-help {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(5, 5, 4, .82);
+  backdrop-filter: blur(10px);
+}
+
+.pwa-install-help[hidden] { display: none !important; }
+
+.pwa-install-card {
+  position: relative;
+  width: min(430px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  border: 1px solid rgba(190, 150, 91, .65);
+  border-radius: 18px;
+  padding: 20px;
+  background: linear-gradient(180deg, #2b241d, #181512);
+  color: #eee3d3;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, .55);
+}
+
+.pwa-install-kicker {
+  color: #cba66d;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+
+.pwa-install-card h2 {
+  margin: 5px 32px 8px 0;
+  font: 800 clamp(21px, 4.6vh, 30px)/1.15 Georgia, "Times New Roman", serif;
+}
+
+.pwa-install-card > p {
+  margin: 0 0 12px;
+  color: #c8baa8;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.pwa-install-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #5c4a38;
+  border-radius: 50%;
+  background: #211b16;
+  color: #d4c4af;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.pwa-install-steps {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 8px 10px;
+  align-items: center;
+  margin: 12px 0;
+}
+
+.pwa-install-steps span {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #443522;
+  color: #f0d5a5;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.pwa-install-steps p {
+  margin: 0;
+  color: #e4d7c6;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.pwa-install-note {
+  padding: 9px 10px;
+  border: 1px solid rgba(122, 94, 58, .55);
+  border-radius: 10px;
+  background: rgba(72, 54, 33, .28);
+}
+
+.pwa-install-done {
+  width: 100%;
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #bd8b49;
+  color: #17110b;
+  font-weight: 900;
 }
 
 body.is-fullscreen .game-topbar,
@@ -101,6 +205,16 @@ body.pwa-standalone .pwa-controls {
     padding: 4px 7px;
     font-size: 8px;
   }
+
+  .pwa-install-card {
+    width: min(470px, calc(100vw - 30px));
+    padding: 14px 16px;
+  }
+
+  .pwa-install-card h2 { font-size: 20px; }
+  .pwa-install-card > p, .pwa-install-steps p { font-size: 9px; }
+  .pwa-install-steps { gap: 5px 8px; margin: 8px 0; }
+  .pwa-install-steps span { width: 22px; height: 22px; font-size: 9px; }
 
   body.is-fullscreen .game-shell,
   body.pwa-standalone .game-shell {
