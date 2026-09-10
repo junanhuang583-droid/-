@@ -43,7 +43,7 @@ function onPointerDown(event: PointerEvent): void {
   if (attackGesture || (event.pointerType === "mouse" && event.button !== 0)) return;
   const target = event.target;
   if (!(target instanceof Element)) return;
-  const source = target.closest<HTMLElement>(".active-board [data-minion-id]");
+  const source = target.closest<HTMLElement>("[data-minion-id]");
   if (!source) return;
   if (document.querySelector(".opening-deal-shield, .overlay, #sacrifice-placement-overlay, #rule-choice-overlay, #unit-effect-overlay")) return;
 
@@ -150,7 +150,7 @@ function updateTarget(current: AttackGesture): void {
   const element = document.elementFromPoint(current.x, current.y);
   if (!(element instanceof Element)) return;
 
-  const enemyMinion = element.closest<HTMLElement>(".opponent-board [data-minion-id].attack-legal-target");
+  const enemyMinion = element.closest<HTMLElement>("[data-minion-id].attack-legal-target");
   if (enemyMinion) {
     current.target = enemyMinion;
     current.targetKind = "minion";
