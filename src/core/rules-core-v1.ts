@@ -20,6 +20,14 @@ export const RULES_CORE_V1 = {
   evolutionTriggersDeathrattle: null,
   weaponSlotsPerPlayer: 1,
   sceneSlotsPerPlayer: 1,
+  /** “单位”无敌我限定时包含双方英雄与双方随从。 */
+  unqualifiedUnitScope: "both_heroes_and_minions",
+  /** “随从”无敌我限定时包含双方随从，不含英雄。 */
+  unqualifiedMinionScope: "both_sides_minions",
+  friendlyUnitIncludesHero: true,
+  enemyUnitIncludesHero: true,
+  /** 需要手动选择目标的效果同样受嘲讽约束。 */
+  targetedEffectsRespectTaunt: true,
 } as const;
 
 /**
