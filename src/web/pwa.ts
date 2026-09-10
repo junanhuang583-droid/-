@@ -28,7 +28,8 @@ window.addEventListener("appinstalled", () => {
   installPrompt = null;
   syncModeClasses();
   syncControls();
-  showPwaToast("Card Game 已安装。以后从桌面图标打开会使用独立全屏模式。");
+  hideInstallHelp();
+  showPwaToast("Card Game 已安装。请从桌面 Card Game 图标启动独立模式。");
 });
 
 document.addEventListener("fullscreenchange", () => {
@@ -46,7 +47,7 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     const swUrl = new URL("./sw.js", window.location.href);
     void navigator.serviceWorker.register(swUrl).catch(() => {
-      // PWA support is an enhancement. The game remains playable if registration fails.
+      // PWA support is optional. The browser game remains usable if registration fails.
     });
   });
 }
@@ -59,7 +60,7 @@ function mountPwaControls(): void {
   controls.className = "pwa-controls";
   controls.innerHTML = `
     <button id="fullscreen-toggle" class="pwa-control-button" type="button" aria-label="切换全屏">⛶ 全屏</button>
-    <button id="install-app" class="pwa-control-button" type="button" aria-label="安装 Card Game">＋ 安装</button>
+    <button id="install-app" class="pwa-control-button" type="button" aria-label="安装 Card Game">安装方法</button>
   `;
   document.body.append(controls);
 
@@ -69,6 +70,27 @@ function mountPwaControls(): void {
   toast.setAttribute("role", "status");
   document.body.append(toast);
 
+  const help = document.createElement("div");
+  help.id = "pwa-install-help";
+  help.className = "pwa-install-help";
+  help.hidden = true;
+  help.innerHTML = `
+    <div class="pwa-install-card" role="dialog" aria-modal="true" aria-labelledby="pwa-install-title">
+      <button class="pwa-install-close" type="button" data-close-install aria-label="关闭">×</button>
+      <span class="pwa-install-kicker">Card Game 应用模式</span>
+      <h2 id="pwa-install-title">安装到手机桌面</h2>
+      <p>安装成功后，桌面会出现 <strong>Card Game</strong> 图标。以后从这个图标启动，才会使用独立应用窗口并尽量隐藏浏览器工具栏。</p>
+      <div class="pwa-install-steps">
+        <span>1</span><p>打开当前浏览器的菜单或工具箱。</p>
+        <span>2</span><p>选择“安装应用”“添加到主屏幕”或名称相近的选项。</p>
+        <span>3</span><p>确认后回到桌面，从 Card Game 图标重新打开。</p>
+      </div>
+      <p class="pwa-install-note">如果浏览器支持网页内直接安装，这个按钮会自动改成“＋ 安装”，点击后直接出现系统安装框。</p>
+      <button class="pwa-install-done" type="button" data-close-install>知道了</button>
+    </div>
+  `;
+  document.body.append(help);
+
   fullscreenButton = document.querySelector<HTMLButtonElement>("#fullscreen-toggle");
   installButton = document.querySelector<HTMLButtonElement>("#install-app");
 
@@ -77,6 +99,10 @@ function mountPwaControls(): void {
   });
   installButton?.addEventListener("click", () => {
     void installApp();
+  });
+  help.addEventListener("click", (event) => {
+    const target = event.target as HTMLElement | null;
+    if (target === help || target?.closest("[data-close-install]")) hideInstallHelp();
   });
 
   syncModeClasses();
@@ -91,14 +117,14 @@ async function toggleFullscreen(): Promise<void> {
     }
 
     if (!document.fullscreenEnabled || !document.documentElement.requestFullscreen) {
-      showPwaToast("当前浏览器不允许网页主动进入全屏。可以使用“安装”后从桌面图标启动。");
+      showPwaToast("当前浏览器不允许网页主动进入全屏。可以安装到桌面后从 Card Game 图标启动。");
       return;
     }
 
     await document.documentElement.requestFullscreen();
     await tryLockLandscape();
   } catch {
-    showPwaToast("这次全屏请求被系统拦截了。再点一次“全屏”，或安装到桌面后启动。");
+    showPwaToast("这次全屏请求被系统拦截了。可以再点一次，或安装到桌面后启动。");
   }
 }
 
@@ -108,18 +134,18 @@ async function tryLockLandscape(): Promise<void> {
   try {
     await orientation.lock("landscape");
   } catch {
-    // Some mobile browsers only allow orientation lock for installed PWAs.
+    // Some browsers only allow orientation lock for installed applications.
   }
 }
 
 async function installApp(): Promise<void> {
   if (isStandaloneMode()) {
-    showPwaToast("现在已经在独立应用模式中运行。");
+    showPwaToast("现在已经在 Card Game 独立应用模式中运行。");
     return;
   }
 
   if (!installPrompt) {
-    showPwaToast("如果没有弹出安装框，请打开浏览器菜单，选择“安装应用”或“添加到主屏幕”。");
+    showInstallHelp();
     return;
   }
 
@@ -129,8 +155,20 @@ async function installApp(): Promise<void> {
   const choice = await prompt.userChoice;
   syncControls();
   if (choice.outcome === "accepted") {
-    showPwaToast("安装完成后，从桌面 Card Game 图标启动即可脱离浏览器工具栏。");
+    showPwaToast("安装完成后，请从桌面 Card Game 图标重新启动。");
+  } else {
+    showPwaToast("已取消安装。需要时可以再次使用安装入口。");
   }
+}
+
+function showInstallHelp(): void {
+  const help = document.querySelector<HTMLElement>("#pwa-install-help");
+  if (help) help.hidden = false;
+}
+
+function hideInstallHelp(): void {
+  const help = document.querySelector<HTMLElement>("#pwa-install-help");
+  if (help) help.hidden = true;
 }
 
 function syncModeClasses(): void {
@@ -150,6 +188,7 @@ function syncControls(): void {
   }
   if (installButton) {
     installButton.hidden = standalone;
+    installButton.textContent = installPrompt ? "＋ 安装" : "安装方法";
     installButton.classList.toggle("install-ready", installPrompt !== null);
   }
 }
@@ -170,5 +209,5 @@ function showPwaToast(message: string): void {
   toastTimer = window.setTimeout(() => {
     toast.classList.remove("show");
     toastTimer = null;
-  }, 3600);
+  }, 4200);
 }
