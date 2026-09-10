@@ -14,6 +14,21 @@ let pending: { handIndex: number; cardId: CardId; sacrificeCount: number } | nul
 let suppressAutoOpen = false;
 
 document.addEventListener("click", interceptSacrificeFlow, true);
+window.addEventListener("cardgame:request-sacrifice", onGestureSacrificeRequest as EventListener);
+
+function onGestureSacrificeRequest(event: CustomEvent<{ handIndex?: number }>): void {
+  const handIndex = Number(event.detail?.handIndex);
+  if (!Number.isInteger(handIndex)) return;
+  const session = loadSavedSession();
+  if (!session || session.handoffRequired || session.state.winner) return;
+  const cardId = session.state.players[session.state.activePlayer].hand[handIndex];
+  if (!cardId) return;
+  const card = catalog.cards.get(cardId);
+  if (!card) return;
+  const requirement = getSummonRequirement(card);
+  if (requirement.unsupportedReason || requirement.sacrificeCount <= 0) return;
+  openPicker({ handIndex, cardId, sacrificeCount: requirement.sacrificeCount });
+}
 
 function interceptSacrificeFlow(event: MouseEvent): void {
   const target = event.target;
@@ -21,6 +36,7 @@ function interceptSacrificeFlow(event: MouseEvent): void {
 
   const handCard = target.closest<HTMLElement>("[data-hand-index]");
   if (handCard) {
+    if (document.body.classList.contains("foundation-ab-enabled")) return;
     if (!suppressAutoOpen) queueMicrotask(openFromSelectedHandCard);
     return;
   }
@@ -32,8 +48,6 @@ function interceptSacrificeFlow(event: MouseEvent): void {
   const details = sacrificeDetailsForElement(selectedCard);
   if (!details) return;
 
-  // Sacrifice summons no longer require choosing an empty destination. Stop the
-  // old empty-slot flow and open the sacrifice picker instead.
   event.preventDefault();
   event.stopPropagation();
   event.stopImmediatePropagation();
@@ -41,6 +55,7 @@ function interceptSacrificeFlow(event: MouseEvent): void {
 }
 
 function openFromSelectedHandCard(): void {
+  if (document.body.classList.contains("foundation-ab-enabled")) return;
   if (suppressAutoOpen || document.querySelector("#sacrifice-placement-overlay")) return;
   if (document.querySelector("#rule-choice-overlay, #unit-effect-overlay")) return;
   const selectedCard = document.querySelector<HTMLElement>(".hand-card.selected[data-hand-index]");
