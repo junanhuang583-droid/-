@@ -1,5 +1,5 @@
-import type { CardId, MinionCardDefinition } from "../model/cards.js";
-import type { GameState, MinionInstance, PlayerId, PlayerState } from "../model/state.js";
+import type { CardId, Keyword, MinionCardDefinition } from "../model/cards.js";
+import type { GameState, MinionInstance, PlayerId, PlayerState, StatusState } from "../model/state.js";
 import { RULES_CORE_V1 } from "./rules-core-v1.js";
 
 export interface BasicGameLogEntry {
@@ -25,6 +25,17 @@ export interface BasicGameCatalog {
   playableUniqueCards: number;
   skippedCardIds: CardId[];
 }
+
+const FIRST_WAVE_KEYWORDS = new Set<Keyword>([
+  "haste",
+  "fast_attack",
+  "taunt",
+  "arrogance",
+  "guard",
+  "armor_1",
+  "armor_2",
+  "lifesteal",
+]);
 
 /**
  * Browser acceptance mode deliberately widens the demo pool without changing
@@ -100,7 +111,8 @@ export function createBasicGame(
   drawCards(session, "P1", RULES_CORE_V1.startingHandSize, random);
   drawCards(session, "P2", RULES_CORE_V1.startingHandSize, random);
   beginTurn(session, firstPlayer, random);
-  log(session, `新对局开始，${playerName(firstPlayer)}先手。基础验收模式不执行任何随从特殊效果。`);
+  log(session, `新对局开始，${playerName(firstPlayer)}先手。`);
+  log(session, "规则第一批已启用：扣血召唤、迅疾、快攻、嘲讽、狂妄、守护、甲一/甲二、吸血。其余特殊效果暂不执行。");
   log(session, `演示牌池载入 ${catalog.playableUniqueCards} 种、共 ${catalog.playableDeckSize} 张可运行随从。未知卡牌数量只在本演示牌池临时按 1 张使用，不写回正式卡牌记录。`);
   return session;
 }
@@ -131,7 +143,15 @@ export function summonFromHand(
     return "这张牌当前不能在基础模式召唤。";
   }
 
+  const summonRule = parseFirstWaveSummonRule(card.summonText);
+  if (summonRule.unsupportedReason) return summonRule.unsupportedReason;
+
   player.hand.splice(handIndex, 1);
+  if (summonRule.healthCost > 0) {
+    player.health -= summonRule.healthCost;
+    log(session, `${playerName(player.id)}为召唤「${card.name}」支付 ${summonRule.healthCost} 点生命。`);
+  }
+
   const instance: MinionInstance = {
     instanceId: createId(),
     cardId,
@@ -141,11 +161,12 @@ export function summonFromHand(
     attackModifier: 0,
     attacksUsedThisTurn: 0,
     summonedOnTurn: session.state.turn,
-    statuses: [],
+    statuses: initialKeywordStatuses(card),
   };
   player.board[slotIndex] = instance;
   player.normalSummonsUsedThisTurn += 1;
   log(session, `${playerName(player.id)}召唤了「${card.name}」到 ${slotIndex + 1} 号位。`);
+  resolveWinner(session);
   touch(session);
   return null;
 }
@@ -158,23 +179,28 @@ export function attackMinion(
 ): string | null {
   if (session.state.winner) return "对局已经结束。";
   if (session.handoffRequired) return "请先完成回合交接。";
-  const attacker = findBoardMinion(session, session.state.activePlayer, attackerInstanceId);
-  const defenderId = otherPlayer(session.state.activePlayer);
+  const active = session.state.activePlayer;
+  const attacker = findBoardMinion(session, active, attackerInstanceId);
+  const defenderId = otherPlayer(active);
   const target = findBoardMinion(session, defenderId, targetInstanceId);
   if (!attacker || !target) return "攻击目标不存在。";
   const reason = validateAttacker(session, attacker);
   if (reason) return reason;
+  const targetReason = validateAttackTarget(session, catalog, attacker.minion, target.minion);
+  if (targetReason) return targetReason;
 
   const attack = getAttack(attacker.minion, catalog);
-  target.minion.currentHealth -= attack;
+  const damage = applyDamageToMinion(target.minion, attack, catalog);
   attacker.minion.attacksUsedThisTurn += 1;
   const attackerName = cardName(attacker.minion.cardId, catalog);
   const targetName = cardName(target.minion.cardId, catalog);
-  log(session, `${playerName(session.state.activePlayer)}的「${attackerName}」攻击「${targetName}」，造成 ${attack} 点伤害。`);
+  log(session, `${playerName(active)}的「${attackerName}」攻击「${targetName}」，实际造成 ${damage} 点伤害。`);
+  applyLifesteal(session, catalog, attacker.minion, damage);
 
   if (target.minion.currentHealth <= 0) {
     killMinion(session, defenderId, target.slotIndex, "damage", catalog);
   }
+  resolveWinner(session);
   touch(session);
   return null;
 }
@@ -191,12 +217,16 @@ export function attackHero(
   if (!attacker) return "攻击随从不存在。";
   const reason = validateAttacker(session, attacker);
   if (reason) return reason;
+  if (!hasKeyword(attacker.minion, "arrogance") && enemyHasTaunt(session, catalog, active)) {
+    return "对方场上存在嘲讽随从，必须优先攻击嘲讽目标。";
+  }
 
   const targetPlayerId = otherPlayer(active);
   const damage = getAttack(attacker.minion, catalog);
   session.state.players[targetPlayerId].health -= damage;
   attacker.minion.attacksUsedThisTurn += 1;
   log(session, `${playerName(active)}的「${cardName(attacker.minion.cardId, catalog)}」直接攻击${playerName(targetPlayerId)}，造成 ${damage} 点伤害。`);
+  applyLifesteal(session, catalog, attacker.minion, damage);
   resolveWinner(session);
   touch(session);
   return null;
@@ -276,15 +306,99 @@ function validateAttacker(
 ): string | null {
   const minion = found.minion;
   if (minion.controller !== session.state.activePlayer) return "只能使用当前回合一方的随从攻击。";
-  if (minion.summonedOnTurn === session.state.turn) return "普通随从上场当回合不能攻击。";
-  if (minion.attacksUsedThisTurn >= RULES_CORE_V1.normalMinionAttacksPerTurn) return "该随从本回合已经攻击过。";
+  if (minion.summonedOnTurn === session.state.turn && !hasKeyword(minion, "haste")) {
+    return "普通随从上场当回合不能攻击。";
+  }
+  const maxAttacks = hasKeyword(minion, "fast_attack") ? 2 : RULES_CORE_V1.normalMinionAttacksPerTurn;
+  if (minion.attacksUsedThisTurn >= maxAttacks) return "该随从本回合已经用完攻击次数。";
   return null;
+}
+
+function validateAttackTarget(
+  session: BasicGameSession,
+  catalog: BasicGameCatalog,
+  attacker: MinionInstance,
+  target: MinionInstance,
+): string | null {
+  if (hasKeyword(attacker, "arrogance")) return null;
+  if (!enemyHasTaunt(session, catalog, session.state.activePlayer)) return null;
+  if (cardHasKeyword(catalog.cards.get(target.cardId), "taunt") || hasKeyword(target, "taunt")) return null;
+  return "对方场上存在嘲讽随从，必须优先攻击嘲讽目标。";
+}
+
+function enemyHasTaunt(session: BasicGameSession, catalog: BasicGameCatalog, attackerPlayer: PlayerId): boolean {
+  const enemy = session.state.players[otherPlayer(attackerPlayer)];
+  return enemy.board.some((minion) => minion !== null && (hasKeyword(minion, "taunt") || cardHasKeyword(catalog.cards.get(minion.cardId), "taunt")));
 }
 
 function getAttack(minion: MinionInstance, catalog: BasicGameCatalog): number {
   const card = catalog.cards.get(minion.cardId);
   const base = card?.attack ?? 0;
   return Math.max(RULES_CORE_V1.attackFloor, base + minion.attackModifier);
+}
+
+function applyDamageToMinion(minion: MinionInstance, incomingDamage: number, catalog: BasicGameCatalog): number {
+  if (incomingDamage <= 0) return 0;
+
+  const guard = minion.statuses.find((status) => status.keyword === "guard" && (status.charges ?? 0) > 0);
+  if (guard) {
+    guard.charges = Math.max(0, (guard.charges ?? 0) - 1);
+    return 0;
+  }
+
+  const card = catalog.cards.get(minion.cardId);
+  let reduction = 0;
+  if (hasKeyword(minion, "armor_1") || cardHasKeyword(card, "armor_1")) reduction += 1;
+  if (hasKeyword(minion, "armor_2") || cardHasKeyword(card, "armor_2")) reduction += 2;
+  const damage = Math.max(0, incomingDamage - reduction);
+  minion.currentHealth -= damage;
+  return damage;
+}
+
+function applyLifesteal(
+  session: BasicGameSession,
+  catalog: BasicGameCatalog,
+  attacker: MinionInstance,
+  actualDamage: number,
+): void {
+  if (actualDamage <= 0) return;
+  if (!hasKeyword(attacker, "lifesteal") && !cardHasKeyword(catalog.cards.get(attacker.cardId), "lifesteal")) return;
+  const player = session.state.players[attacker.controller];
+  player.health += actualDamage;
+  log(session, `「${cardName(attacker.cardId, catalog)}」吸血，为${playerName(player.id)}回复 ${actualDamage} 点生命。`);
+}
+
+function initialKeywordStatuses(card: MinionCardDefinition): StatusState[] {
+  const keywords = new Set(
+    card.effects
+      .filter((effect) => effect.implementation === "keyword" && effect.keyword && FIRST_WAVE_KEYWORDS.has(effect.keyword))
+      .map((effect) => effect.keyword!),
+  );
+  return [...keywords].map((keyword) => keyword === "guard"
+    ? { keyword, charges: 1, sourceCardId: card.id }
+    : { keyword, sourceCardId: card.id });
+}
+
+function hasKeyword(minion: MinionInstance, keyword: Keyword): boolean {
+  return minion.statuses.some((status) => status.keyword === keyword && (keyword !== "guard" || (status.charges ?? 0) > 0));
+}
+
+function cardHasKeyword(card: MinionCardDefinition | undefined, keyword: Keyword): boolean {
+  return card?.effects.some((effect) => effect.implementation === "keyword" && effect.keyword === keyword) ?? false;
+}
+
+function parseFirstWaveSummonRule(summonText: string | null): { healthCost: number; unsupportedReason: string | null } {
+  if (!summonText || /直接召唤/.test(summonText)) return { healthCost: 0, unsupportedReason: null };
+  const healthMatch = summonText.match(/扣\s*(\d+)\s*血/);
+  const healthCost = healthMatch ? Number(healthMatch[1]) : 0;
+
+  if (/进化石|献祭|需.+召唤|＋|\+/.test(summonText)) {
+    return { healthCost, unsupportedReason: "这张牌还包含进化石、献祭或前置随从等召唤条件，下一阶段实现后才能召唤。" };
+  }
+  if (/扣[^\d\s].*血/.test(summonText) || (!healthMatch && !/直接召唤/.test(summonText))) {
+    return { healthCost, unsupportedReason: "这张牌的召唤条件尚未完全程序化。" };
+  }
+  return { healthCost, unsupportedReason: null };
 }
 
 function killMinion(
@@ -307,7 +421,7 @@ function killMinion(
     cause,
     canRevive: cause !== "execution",
   });
-  log(session, `「${cardName(minion.cardId, catalog)}」死亡并进入${playerName(playerId)}弃牌堆。特殊亡语未执行。`);
+  log(session, `「${cardName(minion.cardId, catalog)}」死亡并进入${playerName(playerId)}弃牌堆。亡语等后续效果暂未执行。`);
 }
 
 function resolveWinner(session: BasicGameSession): void {
