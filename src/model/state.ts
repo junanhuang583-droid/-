@@ -7,6 +7,10 @@ export interface StatusState {
   remainingOwnTurns?: number;
   charges?: number;
   sourceCardId?: CardId;
+  /** 控制状态从该单位所属方的第几个自己的回合开始生效。 */
+  activeFromOwnTurn?: number;
+  /** 控制状态在该单位所属方的这个自己的回合结束后失效。 */
+  expiresAfterOwnTurn?: number;
 }
 
 export interface MinionInstance {
