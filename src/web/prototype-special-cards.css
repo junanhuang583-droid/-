@@ -1,0 +1,172 @@
+/* Prototype special-card presentation. Keeps unconfirmed mechanics visible but inert. */
+
+.prototype-deck-chip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  padding-top: 5px;
+  border-top: 1px solid rgba(255,255,255,.06);
+  font-size: 7px;
+  color: #a99b88;
+}
+.prototype-deck-chip span { color: #d0a865; font-weight: 900; }
+.prototype-deck-chip b {
+  padding: 2px 5px;
+  border: 1px solid rgba(153,121,77,.36);
+  border-radius: 999px;
+  background: rgba(17,15,13,.42);
+  color: #c9baa4;
+  font-weight: 800;
+}
+
+.game-shell.tabletop-theme .hand-row .prototype-special-card {
+  display: grid;
+  grid-template-rows: 8px minmax(0, 1fr) auto auto auto;
+  gap: 2px;
+  text-align: left;
+  overflow: hidden;
+  border-width: 1px;
+}
+.game-shell.tabletop-theme .hand-row .prototype-stone-card {
+  border-color: rgba(104,185,214,.62);
+  background:
+    radial-gradient(circle at 50% 30%, rgba(80,202,225,.22), transparent 42%),
+    linear-gradient(180deg,#24363d,#171d21);
+}
+.game-shell.tabletop-theme .hand-row .prototype-attack-card {
+  border-color: rgba(206,127,81,.6);
+  background:
+    radial-gradient(circle at 50% 30%, rgba(218,108,64,.2), transparent 42%),
+    linear-gradient(180deg,#3b2a23,#211916);
+}
+.prototype-special-art {
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(10,12,13,.28);
+  font: 900 clamp(20px,4vh,36px)/1 Georgia,serif;
+}
+.prototype-stone-card .prototype-special-art { color: #a6efff; text-shadow: 0 0 14px rgba(101,211,235,.45); }
+.prototype-attack-card .prototype-special-art { color: #ffc09c; text-shadow: 0 0 14px rgba(226,112,70,.38); }
+.prototype-special-card > strong { font-size: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prototype-special-type { color: #a99a88; font-size: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prototype-special-card > small { color: #d8c5a8 !important; display: block !important; font-size: 6px !important; }
+.game-shell.tabletop-theme .hand-row .prototype-special-card.prototype-selected {
+  z-index: 74 !important;
+  transform: translateY(-18px) rotate(0deg) scale(1.08) !important;
+  box-shadow: 0 0 0 2px rgba(207,173,108,.22),0 16px 28px rgba(0,0,0,.52);
+}
+
+.prototype-special-preview {
+  position: fixed;
+  z-index: 86;
+  width: clamp(188px,22vw,260px);
+  height: min(78dvh,420px);
+  min-height: 250px;
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-rows: auto minmax(72px,32%) auto minmax(0,1fr) auto;
+  gap: 6px;
+  padding: 9px;
+  overflow: hidden;
+  border: 2px solid var(--special-accent,#c79b60);
+  border-radius: 16px;
+  color: #f4e8d8;
+  background:
+    radial-gradient(circle at 50% 18%,var(--special-wash,rgba(160,112,61,.28)),transparent 38%),
+    linear-gradient(180deg,#382f27,#211c18 62%,#161310);
+  box-shadow: 0 26px 70px rgba(0,0,0,.62),0 0 25px var(--special-glow,rgba(196,147,81,.22));
+  animation: prototype-card-rise .16s cubic-bezier(.18,.78,.28,1) both;
+}
+.special-preview-stone {
+  --special-accent:#67c9df;
+  --special-wash:rgba(68,180,207,.3);
+  --special-glow:rgba(73,194,222,.26);
+}
+.special-preview-attack {
+  --special-accent:#df8b61;
+  --special-wash:rgba(196,91,53,.28);
+  --special-glow:rgba(214,100,59,.23);
+}
+@keyframes prototype-card-rise {
+  from { opacity: 0; transform: translateX(-50%) translateY(16px) scale(.9); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+.prototype-preview-close {
+  position: absolute;
+  z-index: 2;
+  top: 7px;
+  right: 7px;
+  width: 25px;
+  height: 25px;
+  border: 1px solid rgba(255,255,255,.13);
+  border-radius: 50%;
+  background: rgba(12,12,12,.64);
+  color: #eadfce;
+  font-size: 17px;
+  line-height: 1;
+}
+.prototype-preview-meta { display:flex; justify-content:space-between; gap:6px; padding-right:27px; color:#a99a87; font-size:7px; }
+.prototype-preview-meta span:last-child { color:var(--special-accent); font-weight:900; }
+.prototype-preview-art {
+  display:grid;
+  place-items:center;
+  min-height:0;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:10px;
+  background:rgba(8,10,11,.28);
+  color:var(--special-accent);
+  font:900 clamp(42px,9vh,76px)/1 Georgia,serif;
+  text-shadow:0 0 20px var(--special-glow);
+}
+.prototype-preview-title { display:flex; align-items:flex-end; justify-content:space-between; gap:8px; }
+.prototype-preview-title strong { font:900 clamp(15px,2.1vw,20px)/1.05 Georgia,"Times New Roman",serif; }
+.prototype-preview-title small { color:#baa992; font-size:7px; text-align:right; }
+.prototype-preview-scroll {
+  min-height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  touch-action:pan-y;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  padding:1px 3px 3px 1px;
+  scrollbar-width:thin;
+}
+.prototype-preview-section {
+  padding:7px;
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:8px;
+  background:rgba(11,10,9,.35);
+}
+.prototype-preview-section b { display:block; margin-bottom:3px; color:var(--special-accent); font-size:8px; }
+.prototype-preview-section p { margin:0; color:#eadbc8; font-size:8px; line-height:1.48; }
+.prototype-preview-foot {
+  padding-top:5px;
+  border-top:1px solid rgba(255,255,255,.08);
+  color:#928574;
+  font-size:7px;
+  text-align:center;
+}
+
+@media (orientation:landscape) and (max-height:520px) {
+  .prototype-special-preview {
+    width:min(230px,29vw);
+    height:calc(100dvh - 16px);
+    min-height:0;
+    grid-template-rows:auto minmax(54px,27%) auto minmax(0,1fr) auto;
+    gap:4px;
+    padding:7px;
+    border-radius:12px;
+  }
+  .prototype-preview-art { font-size:38px; }
+  .prototype-preview-title strong { font-size:13px; }
+  .prototype-preview-section { padding:5px; }
+  .prototype-preview-section p,.prototype-preview-section b { font-size:7px; }
+  .prototype-deck-chip { display:none; }
+}
