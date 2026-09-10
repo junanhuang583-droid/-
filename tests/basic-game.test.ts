@@ -25,7 +25,7 @@ function card(
     name,
     type: "minion",
     attributes: ["普通"],
-    copies: options.copies ?? 40,
+    copies: options.copies === undefined ? 40 : options.copies,
     notes: [],
     health,
     attack,
