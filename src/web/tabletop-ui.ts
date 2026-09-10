@@ -1,11 +1,11 @@
 import cardRecord from "../../docs/卡牌游戏记录_v0.5.md?raw";
-import { parseMinionCardsFromRecord } from "../data/parse-card-record.js";
-import type { MinionCardDefinition } from "../model/cards.js";
+import { parseMinionCardsFromRecord, type ParsedMinionCard } from "../data/parse-card-record.js";
 import type { PlayerId } from "../model/state.js";
 import { loadSavedSession } from "./persistence.js";
 import "./tabletop-ui.css";
+import "./card-detail.css";
 
-const cards: MinionCardDefinition[] = parseMinionCardsFromRecord(cardRecord);
+const cards: ParsedMinionCard[] = parseMinionCardsFromRecord(cardRecord);
 const byId = new Map(cards.map((card) => [card.id, card]));
 let scheduled = false;
 
@@ -70,7 +70,7 @@ function decorateHandHeading(playerId: PlayerId): void {
   chip.textContent = `${playerId} · 当前玩家`;
 
   const hint = heading.querySelector<HTMLElement>("small");
-  if (hint) hint.textContent = "点牌查看完整卡面；普通召唤再点空位，献祭召唤会直接选择祭品。";
+  if (hint) hint.textContent = "点牌展开完整详情；详情内可上下滑动。普通召唤再点空位，献祭召唤直接选择祭品。";
 }
 
 function decorateHandoff(playerId: PlayerId): void {
@@ -122,7 +122,10 @@ function fanHand(): void {
   });
 }
 
-function syncSelectedCardPreview(playerId: PlayerId, hand: Array<`C${string}` | `T${string}` | `E${string}` | `S${string}` | `A${string}` | `X${string}`>): void {
+function syncSelectedCardPreview(
+  playerId: PlayerId,
+  hand: Array<`C${string}` | `T${string}` | `E${string}` | `S${string}` | `A${string}` | `X${string}`>,
+): void {
   const selected = document.querySelector<HTMLElement>(".hand-card.selected[data-hand-index]");
   if (!selected) {
     removePreview();
@@ -151,13 +154,19 @@ function syncSelectedCardPreview(playerId: PlayerId, hand: Array<`C${string}` | 
     preview.dataset.previewKey = previewKey;
     preview.innerHTML = renderFullCard(card);
     document.body.append(preview);
+
+    preview.querySelector<HTMLButtonElement>("[data-close-preview]")?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      selected.click();
+    });
   }
 
   positionPreview(selected, preview);
 }
 
-function renderFullCard(card: MinionCardDefinition): string {
-  const attributes = card.attributes.length > 0 ? card.attributes.join(" · ") : "属性未记录";
+function renderFullCard(card: ParsedMinionCard): string {
+  const attributes = card.attributes.length > 0 ? card.attributes.join(" · ") : "未单独确认";
   const summon = card.summonText ?? "直接召唤";
   const effects = card.effects.length > 0
     ? card.effects.map((effect) => {
@@ -165,21 +174,62 @@ function renderFullCard(card: MinionCardDefinition): string {
         return `<p>${name}${escapeHtml(effect.text)}</p>`;
       }).join("")
     : "<p>无额外效果</p>";
+  const notes = card.notes.length > 0
+    ? `<section class="preview-section"><h4>记录备注</h4>${card.notes.map((note) => `<p>${escapeHtml(note)}</p>`).join("")}</section>`
+    : "";
+  const recordLines = renderRecordLines(card.rawText);
+  const copies = card.copies === null ? "未提供" : `${card.copies} 张`;
+  const healing = card.healing === null ? "无 / 未记录" : String(card.healing);
 
   return `
-    <div class="preview-meta"><span>${escapeHtml(card.id)}</span><span>随从</span></div>
-    <div class="preview-art"><span>${escapeHtml(card.name.slice(0, 1))}</span></div>
+    <div class="preview-card-head">
+      <div class="preview-meta"><span>${escapeHtml(card.id)}</span><span>随从详情</span></div>
+      <button type="button" class="preview-close" data-close-preview aria-label="收起卡牌详情">×</button>
+    </div>
+    <div class="preview-art"><span>${escapeHtml(card.name.slice(0, 1))}</span><small>卡图位置</small></div>
     <div class="preview-title"><strong>${escapeHtml(card.name)}</strong><span class="preview-attrs">${escapeHtml(attributes)}</span></div>
-    <div class="preview-summon">召唤：${escapeHtml(summon)}</div>
-    <div class="preview-effects">${effects}</div>
+    <div class="preview-scroll" tabindex="0">
+      <section class="preview-facts">
+        <div><span>系列</span><strong>${escapeHtml(card.series ?? "未记录")}</strong></div>
+        <div><span>数量</span><strong>${escapeHtml(copies)}</strong></div>
+        <div><span>属性</span><strong>${escapeHtml(attributes)}</strong></div>
+        <div><span>治疗</span><strong>${escapeHtml(healing)}</strong></div>
+      </section>
+      <section class="preview-section">
+        <h4>召唤</h4>
+        <p>${escapeHtml(summon)}</p>
+      </section>
+      <section class="preview-section preview-effects">
+        <h4>技能 / 效果</h4>
+        ${effects}
+      </section>
+      ${notes}
+      <section class="preview-section preview-record">
+        <h4>完整卡牌记录</h4>
+        ${recordLines}
+      </section>
+    </div>
+    <div class="preview-scroll-hint">↕ 上下滑动查看全部信息</div>
     <div class="preview-stats"><span>⚔ ${card.attack ?? "?"}</span><span>♥ ${card.health ?? "?"}</span></div>
   `;
 }
 
+function renderRecordLines(rawText: string): string {
+  const lines = rawText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (lines.length === 0) return "<p>暂无额外记录。</p>";
+  return lines.map((line) => {
+    const bullet = line.match(/^-\s*([^：]+)：(.+)$/);
+    if (bullet) {
+      return `<div class="preview-record-line"><b>${escapeHtml(bullet[1]!.trim())}</b><span>${escapeHtml(bullet[2]!.trim())}</span></div>`;
+    }
+    return `<p>${escapeHtml(line.replace(/^[-*]\s*/, ""))}</p>`;
+  }).join("");
+}
+
 function positionPreview(selected: HTMLElement, preview: HTMLElement): void {
   const selectedRect = selected.getBoundingClientRect();
-  const width = preview.offsetWidth || 180;
-  const height = preview.offsetHeight || 240;
+  const width = preview.offsetWidth || 260;
+  const height = preview.offsetHeight || 360;
   const margin = 8;
   const desiredX = selectedRect.left + selectedRect.width / 2;
   const minX = width / 2 + margin;
@@ -204,11 +254,11 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function escapeHtml(value: string): string {
-  return value.replace(/[&<>'"]/g, (char) => ({
+  return value.replace(/[&<>'\"]/g, (char) => ({
     "&": "&amp;",
     "<": "&lt;",
     ">": "&gt;",
     "'": "&#39;",
-    '"': "&quot;",
+    '\"': "&quot;",
   })[char] ?? char);
 }
