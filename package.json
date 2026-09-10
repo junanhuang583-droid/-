@@ -4,7 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "generate:icons": "node scripts/generate-pwa-icons.mjs",
+    "predev": "npm run generate:icons",
     "dev": "vite",
+    "prebuild": "npm run generate:icons",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
