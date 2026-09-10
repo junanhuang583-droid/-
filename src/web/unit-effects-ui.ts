@@ -11,6 +11,7 @@ import type { CardId, MinionCardDefinition } from "../model/cards.js";
 import type { MinionInstance, PlayerId } from "../model/state.js";
 import { loadSavedSession, saveSession } from "./persistence.js";
 
+const SAVE_KEY = "lushizhizao.basic-game.v1";
 const AUX_KEY = "cardgame.unit-effects.v1";
 const cards: MinionCardDefinition[] = parseMinionCardsFromRecord(cardRecord);
 const byId = new Map(cards.map((card) => [card.id, card]));
@@ -69,7 +70,7 @@ async function syncUnitEffects(): Promise<void> {
     const aux = loadAux(session);
     const sessionChanged = processNewDeaths(session, aux);
     saveAux(aux);
-    if (sessionChanged) saveSession(session);
+    if (sessionChanged) saveAndSync(session);
 
     updateModeNote();
 
@@ -240,8 +241,8 @@ function renderEffectPicker(session: BasicGameSession, aux: UnitEffectsState, ef
     appendLog(session, `「${effect.sourceName}」亡语触发，但没有合法目标。`);
     resolveWinner(session);
     saveAux(aux);
-    saveSession(session);
-    window.location.reload();
+    saveAndSync(session);
+    removeOurOverlay();
     return;
   }
 
@@ -363,8 +364,24 @@ function resolveTargetChoice(key: string): void {
   }
 
   saveAux(aux);
+  removeOurOverlay();
+  saveAndSync(session);
+  scheduleSync();
+}
+
+function saveAndSync(session: BasicGameSession): void {
   saveSession(session);
-  window.location.reload();
+  const value = localStorage.getItem(SAVE_KEY);
+  try {
+    window.dispatchEvent(new StorageEvent("storage", {
+      key: SAVE_KEY,
+      newValue: value,
+      storageArea: localStorage,
+      url: window.location.href,
+    }));
+  } catch {
+    // The saved state is still valid if an older engine cannot construct StorageEvent.
+  }
 }
 
 function applyEffectToTarget(session: BasicGameSession, effect: PendingUnitEffect, target: TargetView): string {
