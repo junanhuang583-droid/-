@@ -398,3 +398,63 @@ body.foundation-cd-enabled .board-slot.minion.cd-battle-unit:hover:not(:disabled
     font-size: 8px !important;
   }
 }
+
+
+/* C+D regression guard: enemy and friendly lanes must remain visually and interactively distinct. */
+body.foundation-cd-enabled .opponent-board,
+body.foundation-cd-enabled .active-board {
+  isolation: isolate !important;
+  overflow: visible !important;
+  pointer-events: auto !important;
+}
+body.foundation-cd-enabled .opponent-board {
+  top: clamp(54px, 13dvh, 92px) !important;
+  bottom: auto !important;
+}
+body.foundation-cd-enabled .active-board {
+  top: auto !important;
+  bottom: clamp(54px, 13dvh, 92px) !important;
+}
+body.foundation-cd-enabled .opponent-board::after,
+body.foundation-cd-enabled .active-board::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: -4%;
+  right: -4%;
+  top: 8%;
+  bottom: 8%;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: .42;
+}
+body.foundation-cd-enabled .opponent-board.foundation-p1::after,
+body.foundation-cd-enabled .active-board.foundation-p1::after {
+  background: radial-gradient(ellipse at center, rgba(93,178,231,.10), transparent 68%);
+}
+body.foundation-cd-enabled .opponent-board.foundation-p2::after,
+body.foundation-cd-enabled .active-board.foundation-p2::after {
+  background: radial-gradient(ellipse at center, rgba(226,116,112,.10), transparent 68%);
+}
+body.foundation-cd-enabled .board-slot.minion.cd-battle-unit {
+  pointer-events: auto !important;
+  touch-action: none !important;
+}
+body.foundation-cd-enabled .opponent-board .board-slot.minion.cd-battle-unit {
+  transform: translateY(-4px) !important;
+}
+body.foundation-cd-enabled .active-board .board-slot.minion.cd-battle-unit {
+  transform: translateY(4px) !important;
+}
+body.foundation-cd-enabled .opponent-board .board-slot.minion.cd-battle-unit:hover:not(:disabled) {
+  transform: translateY(-6px) !important;
+}
+body.foundation-cd-enabled .active-board .board-slot.minion.cd-battle-unit:hover:not(:disabled) {
+  transform: translateY(2px) !important;
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  body.foundation-cd-enabled .opponent-board { top: 48px !important; }
+  body.foundation-cd-enabled .active-board { bottom: 48px !important; }
+  body.foundation-cd-enabled .opponent-board .board-slot.minion.cd-battle-unit { transform: translateY(-3px) !important; }
+  body.foundation-cd-enabled .active-board .board-slot.minion.cd-battle-unit { transform: translateY(3px) !important; }
+}
