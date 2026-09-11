@@ -876,3 +876,250 @@ body.foundation-ef-enabled .board-slot.minion.ef-series-prehistoric > strong {
   body.foundation-ef-enabled .ab-lift-card.ef-series-prehistoric::after { width:58px;height:42px;top:-17px; }
   body.foundation-ef-enabled .ab-lift-card.ef-type-evolution::after { width:34px;height:43px;top:-14px; }
 }
+
+
+/* E+F art pass: replace programmer-drawn placeholders with reusable illustrated SVG frames. */
+body.foundation-ef-enabled .hand-row .hand-card.ef-frame,
+body.foundation-ef-enabled .ab-lift-card.ef-frame {
+  border:0!important;
+  box-shadow:none!important;
+  background-color:transparent!important;
+  background-position:center!important;
+  background-repeat:no-repeat!important;
+  background-size:100% 100%!important;
+}
+body.foundation-ef-enabled .hand-row .hand-card.ef-frame::before,
+body.foundation-ef-enabled .hand-row .hand-card.ef-frame::after,
+body.foundation-ef-enabled .ab-lift-card.ef-frame::before,
+body.foundation-ef-enabled .ab-lift-card.ef-frame::after {
+  display:none!important;
+}
+body.foundation-ef-enabled .hand-row .hand-card.ef-series-base,
+body.foundation-ef-enabled .ab-lift-card.ef-series-base {
+  background-image:url("./assets/frames/base.svg")!important;
+}
+body.foundation-ef-enabled .hand-row .hand-card.ef-series-dragon,
+body.foundation-ef-enabled .ab-lift-card.ef-series-dragon {
+  background-image:url("./assets/frames/dragon.svg")!important;
+}
+body.foundation-ef-enabled .hand-row .hand-card.ef-series-prehistoric,
+body.foundation-ef-enabled .ab-lift-card.ef-series-prehistoric {
+  background-image:url("./assets/frames/prehistoric.svg")!important;
+}
+body.foundation-ef-enabled .hand-row .hand-card.ef-type-attack,
+body.foundation-ef-enabled .ab-lift-card.ef-type-attack {
+  background-image:url("./assets/frames/attack.svg")!important;
+}
+body.foundation-ef-enabled .hand-row .hand-card.ef-type-evolution,
+body.foundation-ef-enabled .ab-lift-card.ef-type-evolution {
+  background-image:url("./assets/frames/evolution.svg")!important;
+}
+
+/* Hand card content now sits inside the painted frame instead of drawing another frame on top. */
+body.foundation-ef-enabled .hand-row .hand-card.ef-frame {
+  overflow:hidden!important;
+  padding:8px 12px 9px!important;
+  grid-template-rows:14px minmax(42px,1fr) 18px 19px!important;
+  gap:1px!important;
+  color:#f4eadb!important;
+}
+body.foundation-ef-enabled .hand-row .hand-card.ef-frame .cd-card-art,
+body.foundation-ef-enabled .hand-row .hand-card.ef-frame .prototype-special-art {
+  margin:4px 5px 0!important;
+  border:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  color:rgba(238,225,203,.62)!important;
+  text-shadow:0 2px 7px rgba(0,0,0,.8)!important;
+}
+body.foundation-ef-enabled .hand-row .hand-card.ef-frame .cd-card-name,
+body.foundation-ef-enabled .hand-row .hand-card.ef-frame > strong {
+  align-self:center!important;
+  z-index:5;
+  margin:0 7px!important;
+  padding:2px 4px!important;
+  border:0!important;
+  border-radius:999px!important;
+  background:rgba(239,229,210,.90)!important;
+  color:#201b16!important;
+  text-shadow:none!important;
+  font-weight:950!important;
+  text-align:center!important;
+}
+body.foundation-ef-enabled .hand-row .hand-card.ef-frame .cd-card-series {
+  color:#ead6a1!important;
+  text-shadow:0 1px 3px rgba(0,0,0,.9)!important;
+}
+body.foundation-ef-enabled .hand-row .hand-card.ef-frame .cd-card-stats {
+  z-index:6;
+  padding:0 0 1px!important;
+}
+body.foundation-ef-enabled .hand-row .hand-card.ef-frame .cd-card-stats span {
+  min-width:23px!important;
+  height:23px!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  color:#fff7e6!important;
+  text-shadow:0 1px 4px rgba(0,0,0,.95)!important;
+  font-size:10px!important;
+}
+body.foundation-ef-enabled .hand-row .hand-card.ef-type-attack .prototype-special-art {
+  color:#e7e3dc!important;
+  font-size:17px!important;
+}
+body.foundation-ef-enabled .hand-row .hand-card.ef-type-evolution .prototype-special-art {
+  color:#dff8ff!important;
+  font-size:24px!important;
+  text-shadow:0 0 16px rgba(92,186,255,.9)!important;
+}
+body.foundation-ef-enabled .hand-row .hand-card.ef-frame .prototype-special-type,
+body.foundation-ef-enabled .hand-row .hand-card.ef-frame > small {
+  display:none!important;
+}
+
+/* Full lifted card: the approved frame is the visual card, while game data stays live text. */
+body.foundation-ef-enabled .ab-lift-card.ef-frame {
+  overflow:visible!important;
+  width:clamp(172px,20vw,220px)!important;
+  height:clamp(264px,58dvh,338px)!important;
+  padding:30px 30px 20px!important;
+  grid-template-rows:14px minmax(82px,44%) 28px 30px minmax(44px,1fr) 30px!important;
+  gap:2px!important;
+  color:#25201b!important;
+}
+body.foundation-ef-enabled .ab-lift-card.ef-frame .ab-gesture-state {
+  position:absolute;
+  z-index:30;
+  top:-27px;
+  left:50%;
+  transform:translateX(-50%);
+  width:max-content;
+  max-width:92vw;
+}
+body.foundation-ef-enabled .ab-lift-card.ef-frame .ab-lift-series {
+  z-index:5;
+  align-self:end!important;
+  padding:0!important;
+  color:#f0d793!important;
+  text-shadow:0 1px 4px rgba(0,0,0,.92)!important;
+}
+body.foundation-ef-enabled .ab-lift-card.ef-frame .ab-lift-art {
+  z-index:3;
+  margin:0 5px!important;
+  border:0!important;
+  border-radius:12px!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  color:rgba(242,230,210,.58)!important;
+  text-shadow:0 2px 9px rgba(0,0,0,.9)!important;
+}
+body.foundation-ef-enabled .ab-lift-card.ef-frame .ab-lift-name {
+  z-index:7;
+  margin:0 2px!important;
+  padding:3px 5px!important;
+  border:0!important;
+  background:transparent!important;
+  text-align:center!important;
+}
+body.foundation-ef-enabled .ab-lift-card.ef-frame .ab-lift-name strong {
+  color:#211b16!important;
+  text-shadow:none!important;
+  font-size:15px!important;
+}
+body.foundation-ef-enabled .ab-lift-card.ef-frame .ab-lift-name small {
+  display:block;
+  color:#64594b!important;
+  font-size:7px!important;
+}
+body.foundation-ef-enabled .ab-lift-card.ef-frame .ab-lift-summon {
+  z-index:7;
+  margin:0 5px!important;
+  padding:5px 6px!important;
+  border:0!important;
+  border-radius:6px!important;
+  background:rgba(241,232,216,.77)!important;
+  color:#382f27!important;
+  font-size:8px!important;
+  line-height:1.25!important;
+}
+body.foundation-ef-enabled .ab-lift-card.ef-frame .ab-lift-effects {
+  z-index:7;
+  margin:0 5px!important;
+  padding:5px 7px!important;
+  border-radius:7px!important;
+  background:rgba(239,229,211,.78)!important;
+  color:#332b24!important;
+  text-shadow:none!important;
+}
+body.foundation-ef-enabled .ab-lift-card.ef-frame .ab-lift-effects p {
+  margin:0 0 3px!important;
+  color:#332b24!important;
+  font-size:8px!important;
+  line-height:1.28!important;
+}
+body.foundation-ef-enabled .ab-lift-card.ef-frame .ab-lift-effects b {
+  color:#5b4326!important;
+}
+body.foundation-ef-enabled .ab-lift-card.ef-frame .ab-lift-stats {
+  z-index:8;
+  align-self:end!important;
+  width:100%!important;
+  margin:0!important;
+  padding:0 1px!important;
+  border:0!important;
+  display:flex!important;
+  justify-content:space-between!important;
+  color:#fff!important;
+}
+body.foundation-ef-enabled .ab-lift-card.ef-frame .ab-lift-stats span {
+  min-width:34px!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  color:#fff6e4!important;
+  text-shadow:0 1px 5px rgba(0,0,0,.95)!important;
+  font-size:15px!important;
+}
+body.foundation-ef-enabled .ab-lift-card.ef-type-attack .ab-lift-stats.single,
+body.foundation-ef-enabled .ab-lift-card.ef-type-evolution .ab-lift-stats.single {
+  justify-content:center!important;
+  color:#5e5549!important;
+}
+body.foundation-ef-enabled .ab-lift-card.ef-type-attack .ab-lift-stats.single span,
+body.foundation-ef-enabled .ab-lift-card.ef-type-evolution .ab-lift-stats.single span {
+  color:#5e5549!important;
+  text-shadow:none!important;
+  font-size:8px!important;
+}
+body.foundation-ef-enabled .ab-lift-card.ef-type-evolution .ab-lift-art {
+  border-radius:50%!important;
+  color:#e0f7ff!important;
+  text-shadow:0 0 18px rgba(75,174,255,.95)!important;
+}
+
+/* Keep play/peek feedback outside the painted frame instead of recoloring the art itself. */
+body.foundation-ef-enabled .ab-lift-card.ef-frame.ab-v2-peek {
+  filter:drop-shadow(0 0 10px rgba(84,181,235,.38));
+}
+body.foundation-ef-enabled .ab-lift-card.ef-frame.ab-v2-play {
+  filter:drop-shadow(0 0 12px rgba(224,179,82,.55));
+}
+
+@media (orientation:landscape) and (max-height:520px) {
+  body.foundation-ef-enabled .hand-row .hand-card.ef-frame {
+    padding:6px 10px 7px!important;
+    grid-template-rows:12px minmax(34px,1fr) 16px 17px!important;
+  }
+  body.foundation-ef-enabled .ab-lift-card.ef-frame {
+    width:clamp(156px,19vw,192px)!important;
+    height:min(78dvh,294px)!important;
+    padding:25px 25px 16px!important;
+    grid-template-rows:12px minmax(70px,43%) 24px 27px minmax(40px,1fr) 26px!important;
+  }
+  body.foundation-ef-enabled .ab-lift-card.ef-frame .ab-lift-effects p,
+  body.foundation-ef-enabled .ab-lift-card.ef-frame .ab-lift-summon { font-size:7px!important; }
+  body.foundation-ef-enabled .ab-lift-card.ef-frame .ab-lift-stats span { font-size:13px!important; }
+}
