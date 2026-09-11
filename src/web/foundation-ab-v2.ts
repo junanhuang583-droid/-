@@ -326,7 +326,12 @@ function createLiftedCard(cardId: CardId): HTMLElement {
   const article = document.createElement("article");
   const minion = byId.get(cardId);
   const special = PROTOTYPE_SPECIAL_BY_ID.get(cardId);
-  article.className = `ab-lift-card ab-v2-gesture-card ab-v2-peek ${special ? "ab-lift-special" : "ab-lift-minion"}`;
+  const frameClass = minion
+    ? frameClassForSeries(minion.series)
+    : special?.type === "evolution_stone"
+      ? "ef-type-evolution"
+      : "ef-type-attack";
+  article.className = `ab-lift-card ab-v2-gesture-card ab-v2-peek ef-frame ${frameClass} ${special ? "ab-lift-special" : "ab-lift-minion"}`;
 
   if (minion) {
     const series = minion.series?.trim() || "随从";
@@ -348,7 +353,7 @@ function createLiftedCard(cardId: CardId): HTMLElement {
     article.innerHTML = `
       <div class="ab-gesture-state">查看中 · 当前效果尚未开放出牌</div>
       <div class="ab-lift-series">${escapeHtml(special.displayType)}</div>
-      <div class="ab-lift-art special"><span>${special.type === "evolution_stone" ? "◇" : "⚔"}</span></div>
+      <div class="ab-lift-art special"><span>${special.type === "evolution_stone" ? "◇" : "攻"}</span></div>
       <div class="ab-lift-name"><strong>${escapeHtml(special.name)}</strong></div>
       <div class="ab-lift-effects"><p>${escapeHtml(special.rulesText)}</p></div>
       <div class="ab-lift-stats single"><span>当前仅展示</span></div>
@@ -357,6 +362,13 @@ function createLiftedCard(cardId: CardId): HTMLElement {
     article.innerHTML = `<div class="ab-gesture-state">查看</div><div class="ab-lift-name"><strong>${escapeHtml(cardId)}</strong></div>`;
   }
   return article;
+}
+
+function frameClassForSeries(series: string | null | undefined): string {
+  const normalized = series?.trim() ?? "";
+  if (normalized === "龙神") return "ef-series-dragon";
+  if (normalized === "史前巨兽") return "ef-series-prehistoric";
+  return "ef-series-base";
 }
 
 function suppressLegacyHandClick(event: MouseEvent): void {
