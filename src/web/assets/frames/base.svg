@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 460">
+<defs>
+<linearGradient id="steel" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e8edf0"/><stop offset=".18" stop-color="#8f979c"/><stop offset=".5" stop-color="#31383d"/><stop offset=".78" stop-color="#b9c0c4"/><stop offset="1" stop-color="#596166"/></linearGradient>
+<linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#f0d28a"/><stop offset=".5" stop-color="#9b6d2c"/><stop offset="1" stop-color="#e1ba67"/></linearGradient>
+<linearGradient id="paper" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#eee5d5"/><stop offset="1" stop-color="#cabda7"/></linearGradient>
+<radialGradient id="art" cx="50%" cy="35%" r="70%"><stop stop-color="#31373c"/><stop offset="1" stop-color="#111416"/></radialGradient>
+<filter id="shadow"><feDropShadow dx="0" dy="5" stdDeviation="5" flood-opacity=".65"/></filter>
+</defs>
+<g filter="url(#shadow)">
+<path d="M34 36 L52 20 H248 L266 36 V424 L248 442 H52 L34 424Z" fill="#121416" stroke="url(#steel)" stroke-width="9"/>
+<path d="M44 46 L58 31 H242 L256 46 V414 L242 431 H58 L44 414Z" fill="none" stroke="url(#gold)" stroke-width="2.6" opacity=".95"/>
+<path d="M56 52 Q48 55 48 66 V242 Q48 252 60 258 H240 Q252 252 252 242 V66 Q252 55 244 52Z" fill="url(#art)" stroke="#6f767a" stroke-width="3"/>
+<path d="M41 258 Q56 246 74 247 H226 Q244 246 259 258 L252 296 Q242 303 228 304 H72 Q58 303 48 296Z" fill="url(#paper)" stroke="#64563f" stroke-width="4"/>
+<path d="M82 298 H218 L211 321 H89Z" fill="#272a2d" stroke="#9a7b46" stroke-width="2"/>
+<path d="M49 320 H251 V418 Q251 426 243 429 H57 Q49 426 49 418Z" fill="url(#paper)" stroke="#6e6353" stroke-width="3"/>
+<g fill="url(#steel)" stroke="#25292c" stroke-width="2"><path d="M34 36 56 20 72 33 50 49Z"/><path d="M266 36 244 20 228 33 250 49Z"/><path d="M34 424 55 441 70 428 50 414Z"/><path d="M266 424 245 441 230 428 250 414Z"/></g>
+<path d="M150 9 163 23 150 37 137 23Z" fill="url(#gold)" stroke="#5a4525" stroke-width="2"/><path d="M150 14 157 23 150 31 143 23Z" fill="#243d68"/>
+<circle cx="45" cy="419" r="27" fill="#173b79" stroke="url(#gold)" stroke-width="5"/><circle cx="255" cy="419" r="27" fill="#781f26" stroke="url(#gold)" stroke-width="5"/>
+<circle cx="45" cy="419" r="18" fill="none" stroke="#87aee0" opacity=".55"/><circle cx="255" cy="419" r="18" fill="none" stroke="#e18b8f" opacity=".55"/>
+</g>
+</svg>
