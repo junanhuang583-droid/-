@@ -33,7 +33,7 @@ function sync(): void {
     return;
   }
 
-  document.body.classList.add("foundation-cd-enabled");
+  document.body.classList.add("foundation-cd-enabled", "foundation-ef-enabled");
   const privateHandoff = session.handoffRequired && !session.state.winner;
   document.body.classList.toggle("cd-handoff-private", privateHandoff);
   shell.classList.toggle("cd-handoff-private-shell", privateHandoff);
@@ -42,7 +42,7 @@ function sync(): void {
   else clearPrivateHand();
 
   decorateHand(session.state.players[session.state.activePlayer].hand);
-  decorateBattleMinions();
+  decorateBattleMinions(session);
   decorateSharedDeck();
 }
 
@@ -58,8 +58,8 @@ function decorateHand(hand: CardId[]): void {
 
     const minion = byId.get(cardId);
     if (minion) {
-      element.classList.add("cd-minion-card");
-      element.classList.remove("cd-special-card");
+      element.classList.add("cd-minion-card", "ef-frame", frameClassForSeries(minion.series));
+      element.classList.remove("cd-special-card", "ef-type-attack", "ef-type-evolution");
       const renderKey = `minion:${cardId}`;
       if (element.dataset.cdRenderKey === renderKey) return;
       element.dataset.cdRenderKey = renderKey;
@@ -77,16 +77,33 @@ function decorateHand(hand: CardId[]): void {
 
     const special = PROTOTYPE_SPECIAL_BY_ID.get(cardId);
     if (special) {
-      element.classList.add("cd-special-card");
-      element.classList.remove("cd-minion-card");
+      element.classList.add(
+        "cd-special-card",
+        "ef-frame",
+        special.type === "evolution_stone" ? "ef-type-evolution" : "ef-type-attack",
+      );
+      element.classList.remove("cd-minion-card", "ef-series-base", "ef-series-dragon", "ef-series-prehistoric");
       element.dataset.cdRenderKey = `special:${cardId}`;
     }
   });
 }
 
-function decorateBattleMinions(): void {
+function decorateBattleMinions(session: NonNullable<ReturnType<typeof loadSavedSession>>): void {
   document.querySelectorAll<HTMLElement>(".board-slot.minion").forEach((element) => {
-    element.classList.add("cd-battle-unit");
+    element.classList.add("cd-battle-unit", "ef-battle-unit");
+    element.classList.remove("ef-series-base", "ef-series-dragon", "ef-series-prehistoric");
+
+    const owner = element.dataset.owner as "P1" | "P2" | undefined;
+    const instanceId = element.dataset.minionId;
+    if (owner && instanceId) {
+      const player = session.state.players[owner];
+      const instance = player.board.find((minion) => minion?.instanceId === instanceId)
+        ?? player.overflowMinions.find((minion) => minion.instanceId === instanceId)
+        ?? null;
+      const definition = instance ? byId.get(instance.cardId) : undefined;
+      element.classList.add(frameClassForSeries(definition?.series));
+    }
+
     const art = element.querySelector<HTMLElement>(".minion-art");
     art?.classList.add("cd-unit-portrait");
     const stats = element.querySelector<HTMLElement>(".minion-stats");
@@ -124,6 +141,13 @@ function ensurePrivateHand(count: number): void {
 function clearPrivateHand(): void {
   document.querySelector("#cd-private-hand")?.remove();
   document.body.classList.remove("cd-handoff-private");
+}
+
+function frameClassForSeries(series: string | null | undefined): string {
+  const normalized = series?.trim() ?? "";
+  if (normalized === "龙神") return "ef-series-dragon";
+  if (normalized === "史前巨兽") return "ef-series-prehistoric";
+  return "ef-series-base";
 }
 
 function escapeHtml(value: string): string {
