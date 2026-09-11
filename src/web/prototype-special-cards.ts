@@ -100,11 +100,16 @@ function decorateSpecialCards(hand: CardId[]): void {
     button.disabled = false;
     button.dataset.prototypeHandIndex = String(index);
     button.dataset.prototypeCardId = definition.id;
-    button.classList.add("prototype-special-card", definition.type === "evolution_stone" ? "prototype-stone-card" : "prototype-attack-card");
+    button.classList.add(
+      "prototype-special-card",
+      "ef-frame",
+      definition.type === "evolution_stone" ? "prototype-stone-card" : "prototype-attack-card",
+      definition.type === "evolution_stone" ? "ef-type-evolution" : "ef-type-attack",
+    );
     button.classList.toggle("prototype-selected", selectedSpecialIndex === index);
     button.innerHTML = `
       <span class="card-id">${escapeHtml(definition.id)}</span>
-      <div class="prototype-special-art"><span>${definition.type === "evolution_stone" ? "◇" : "⚔"}</span></div>
+      <div class="prototype-special-art"><span>${definition.type === "evolution_stone" ? "◇" : "攻"}</span></div>
       <strong>${escapeHtml(definition.name)}</strong>
       <div class="prototype-special-type">${escapeHtml(definition.displayType)}</div>
       <small>${definition.executable ? "可使用" : "点按查看详情"}</small>
