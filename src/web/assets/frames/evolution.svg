@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 460">
+<defs>
+<linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f6dc8d"/><stop offset=".35" stop-color="#a5762c"/><stop offset=".68" stop-color="#f0c45e"/><stop offset="1" stop-color="#6c4b1f"/></linearGradient>
+<linearGradient id="paper" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#eee6da"/><stop offset="1" stop-color="#c7b9a2"/></linearGradient>
+<radialGradient id="portal" cx="50%" cy="45%" r="60%"><stop stop-color="#87ddff"/><stop offset=".32" stop-color="#4a9df0"/><stop offset=".66" stop-color="#2752ae"/><stop offset="1" stop-color="#18245e"/></radialGradient>
+<linearGradient id="crystal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#efffff"/><stop offset=".25" stop-color="#7fe0ff"/><stop offset=".55" stop-color="#3c7df5"/><stop offset=".8" stop-color="#4b4fc4"/><stop offset="1" stop-color="#c28cff"/></linearGradient>
+<filter id="shadow"><feDropShadow dx="0" dy="6" stdDeviation="6" flood-opacity=".72"/></filter>
+<filter id="glow"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<g filter="url(#shadow)">
+<path d="M32 70 50 42 82 32 H218 L250 42 268 70 V422 L249 445 H51 L32 422Z" fill="#152337" stroke="url(#gold)" stroke-width="7"/>
+<path d="M46 77 62 55 H238 L254 77 V407 L239 429 H61 L46 407Z" fill="none" stroke="#6ea9e4" stroke-width="3"/>
+<circle cx="150" cy="170" r="98" fill="url(#portal)" stroke="url(#gold)" stroke-width="5"/>
+<circle cx="150" cy="170" r="79" fill="none" stroke="#a7e5ff" stroke-width="3" opacity=".6"/><circle cx="150" cy="170" r="62" fill="none" stroke="#7597ff" stroke-width="7" opacity=".45"/>
+<g fill="url(#crystal)" stroke="#d6f1ff" stroke-width="1.6" filter="url(#glow)"><path d="M150 3 169 37 150 67 131 37Z"/><path d="M38 96 55 118 42 146 25 121Z"/><path d="M262 96 245 118 258 146 275 121Z"/><path d="M50 190 65 211 52 235 37 214Z"/><path d="M250 190 235 211 248 235 263 214Z"/></g>
+<path d="M36 54 69 73 56 93 25 82Z" fill="url(#gold)"/><path d="M264 54 231 73 244 93 275 82Z" fill="url(#gold)"/>
+<path d="M41 267 Q57 254 75 254 H225 Q243 254 259 267 L251 304 Q239 311 226 311 H74 Q61 311 49 304Z" fill="url(#paper)" stroke="url(#gold)" stroke-width="4"/>
+<path d="M49 307 H251 V416 Q251 425 242 429 H58 Q49 425 49 416Z" fill="url(#paper)" stroke="#8b7755" stroke-width="3"/>
+<path d="M150 408 170 434 150 460 130 434Z" fill="url(#crystal)" stroke="#e4f7ff" stroke-width="1.8" filter="url(#glow)"/>
+<path d="M90 436 118 422 132 438 150 424 168 438 182 422 210 436" fill="none" stroke="url(#gold)" stroke-width="7"/>
+</g>
+</svg>
