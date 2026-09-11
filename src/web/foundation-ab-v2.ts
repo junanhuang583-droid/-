@@ -347,7 +347,7 @@ function createLiftedCard(cardId: CardId): HTMLElement {
       <div class="ab-lift-name"><strong>${escapeHtml(minion.name)}</strong><small>${escapeHtml(attributes)}</small></div>
       <div class="ab-lift-summon">${escapeHtml(summon)}</div>
       <div class="ab-lift-effects">${effects}</div>
-      <div class="ab-lift-stats"><span>⚔ ${minion.attack ?? "?"}</span><span>♥ ${minion.health ?? "?"}</span></div>
+      <div class="ab-lift-stats"><span>${minion.attack ?? "?"}</span><span>${minion.health ?? "?"}</span></div>
     `;
   } else if (special) {
     article.innerHTML = `
