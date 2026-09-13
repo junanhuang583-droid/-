@@ -1905,3 +1905,120 @@ body.foundation-cd-enabled .battlefield-coordinate-layer .board-row > .board-slo
 .battlefield-coordinate-layer .opponent-board .board-slot.empty-slot {
   display: none !important;
 }
+
+
+/* Stage 0-4: compact hand dock.
+   Only battlefield-space occupancy is changed here. Final hand interaction and
+   presentation still belongs to Stage E. */
+body.foundation-cd-enabled .battlefield-coordinate-layer > .hand-dock {
+  --stage04-hand-sink: clamp(30px, 6.5cqh, 48px);
+  --stage04-focus-lift: clamp(38px, 6.2cqh, 50px);
+  position: absolute !important;
+  z-index: 14 !important;
+  left: 4cqw !important;
+  right: 4cqw !important;
+  top: auto !important;
+  bottom: clamp(-48px, -6.5cqh, -30px) !important;
+  width: auto !important;
+  height: clamp(96px, 17cqh, 118px) !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  display: block !important;
+  overflow: visible !important;
+  pointer-events: none !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer > .hand-dock .hand-heading {
+  display: none !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer > .hand-dock .hand-row {
+  position: absolute !important;
+  left: 50% !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: 0 !important;
+  width: min(92cqw, 1120px) !important;
+  height: 100% !important;
+  transform: translateX(-50%) !important;
+  display: flex !important;
+  align-items: flex-end !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  padding: 0 6px !important;
+  overflow: visible !important;
+  scrollbar-width: none !important;
+  pointer-events: auto !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer > .hand-dock .hand-row::-webkit-scrollbar {
+  display: none !important;
+}
+
+body.foundation-cd-enabled.foundation-ab-enabled .battlefield-coordinate-layer > .hand-dock .hand-row .hand-card {
+  flex: 0 0 var(--ab-width, 92px) !important;
+  width: var(--ab-width, 92px) !important;
+  max-width: var(--ab-width, 92px) !important;
+  height: 100% !important;
+  margin-left: var(--ab-overlap, 0px) !important;
+  transform-origin: 50% 128% !important;
+  transform:
+    translateX(var(--stage04-focus-x, 0px))
+    translateY(var(--ab-y, 0px))
+    rotate(var(--ab-angle, 0deg)) !important;
+  z-index: var(--ab-z, 1) !important;
+  transition:
+    transform .15s cubic-bezier(.2,.76,.24,1),
+    opacity .12s ease,
+    filter .12s ease,
+    box-shadow .12s ease !important;
+}
+
+body.foundation-cd-enabled.foundation-ab-enabled .battlefield-coordinate-layer > .hand-dock .hand-row .hand-card:first-child {
+  margin-left: 0 !important;
+}
+
+body.foundation-cd-enabled.foundation-ab-enabled .battlefield-coordinate-layer > .hand-dock .hand-row .hand-card:hover:not(:disabled) {
+  transform:
+    translateX(var(--stage04-focus-x, 0px))
+    translateY(calc(var(--ab-y, 0px) - 7px))
+    rotate(var(--ab-angle, 0deg)) !important;
+}
+
+body.foundation-cd-enabled.foundation-ab-enabled .battlefield-coordinate-layer > .hand-dock .hand-row .hand-card.ab-touching,
+body.foundation-cd-enabled.foundation-ab-enabled .battlefield-coordinate-layer > .hand-dock .hand-row .hand-card.selected,
+body.foundation-cd-enabled.foundation-ab-enabled .battlefield-coordinate-layer > .hand-dock .hand-row .prototype-selected {
+  z-index: 170 !important;
+  transform:
+    translateX(var(--stage04-focus-x, 0px))
+    translateY(calc(var(--ab-y, 0px) - var(--stage04-focus-lift)))
+    rotate(var(--ab-angle, 0deg)) !important;
+}
+
+body.foundation-cd-enabled.foundation-ab-enabled .battlefield-coordinate-layer > .hand-dock .hand-row .hand-card.ab-drag-source {
+  opacity: .24 !important;
+  filter: saturate(.52) brightness(.82) !important;
+}
+
+/* The default dock intentionally reveals only the recognition band. The card
+   is fully exposed only while touched/selected, without increasing dock height. */
+body.foundation-cd-enabled .battlefield-coordinate-layer > .hand-dock .hand-row .hand-card.ef-frame {
+  box-shadow: 0 8px 18px rgba(0,0,0,.38) !important;
+}
+
+/* Keep the hand visually behind the active hero zone. */
+body.foundation-cd-enabled .battlefield-coordinate-layer .active-hero {
+  z-index: 16 !important;
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  body.foundation-cd-enabled .battlefield-coordinate-layer > .hand-dock {
+    bottom: -30px !important;
+    height: 96px !important;
+  }
+
+  body.foundation-cd-enabled .battlefield-coordinate-layer > .hand-dock .hand-row {
+    width: min(94cqw, 900px) !important;
+  }
+}
