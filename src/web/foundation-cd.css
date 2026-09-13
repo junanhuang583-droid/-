@@ -1842,3 +1842,66 @@ body.foundation-cd-enabled .battlefield-coordinate-layer .board-slot.minion.cd-b
   position: relative !important;
   z-index: 3 !important;
 }
+
+
+/* Stage 0-3 final unit-slot decoupling.
+   Logical summon slots stay fixed across five positions. Occupied minions use
+   separate compact coordinates while idle, then temporarily return to their
+   logical slots during summon targeting. */
+.battlefield-coordinate-layer .board-row {
+  position: relative !important;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: visible !important;
+}
+
+.battlefield-coordinate-layer .board-row > .board-slot {
+  position: absolute !important;
+  top: 50% !important;
+  margin: 0 !important;
+}
+
+.battlefield-coordinate-layer .board-row > .board-slot.empty-slot {
+  left: calc(50% + var(--battle-slot-x, 0cqw)) !important;
+  transform: translate(-50%, -50%) !important;
+  display: none !important;
+  width: 8.3cqw !important;
+  height: 13.2cqh !important;
+}
+
+.battlefield-coordinate-layer .active-board.summon-mode .board-slot.empty-slot.summon-ready,
+body.ab-hand-gesture-active .battlefield-coordinate-layer .active-board .board-slot.empty-slot {
+  display: grid !important;
+}
+
+.battlefield-coordinate-layer .board-row > .board-slot.minion {
+  left: calc(50% + var(--battle-unit-x, 0cqw)) !important;
+  transform: translate(-50%, -50%) !important;
+  width: 8.3cqw !important;
+  height: 13.2cqh !important;
+  transition: left .14s ease, transform .14s ease, filter .12s ease !important;
+}
+
+/* In summon mode, occupied minions temporarily align with their logical board
+   slots so every empty drop target has a clean, non-overlapping hit area. */
+.battlefield-coordinate-layer .active-board.summon-mode .board-slot.minion,
+body.ab-hand-gesture-active .battlefield-coordinate-layer .active-board .board-slot.minion {
+  left: calc(50% + var(--battle-slot-x, 0cqw)) !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .board-row > .board-slot.minion.cd-battle-unit,
+body.foundation-cd-enabled .battlefield-coordinate-layer .opponent-board .board-slot.minion.cd-battle-unit,
+body.foundation-cd-enabled .battlefield-coordinate-layer .active-board .board-slot.minion.cd-battle-unit {
+  position: absolute !important;
+  transform: translate(-50%, -50%) !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .board-row > .board-slot.minion.cd-battle-unit:hover:not(:disabled) {
+  transform: translate(-50%, calc(-50% - 2px)) !important;
+}
+
+/* Enemy logical empties never render. */
+.battlefield-coordinate-layer .opponent-board .board-slot.empty-slot {
+  display: none !important;
+}
