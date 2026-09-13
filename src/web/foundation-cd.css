@@ -1804,3 +1804,41 @@ body.foundation-cd-enabled .battlefield-coordinate-layer .board-slot.minion.cd-b
 body.foundation-cd-enabled .battlefield-coordinate-layer .board-slot.minion.cd-battle-unit {
   flex: 0 0 8.3cqw !important;
 }
+
+
+/* Stage 0-3 summon interaction repair.
+   Compact only in the idle state. The drag system finds summon targets with
+   elementFromPoint(), so all five logical positions must re-enter layout as
+   soon as a card reaches play mode. */
+.battlefield-coordinate-layer .active-board .board-slot.empty-slot {
+  display: none !important;
+  flex: 0 0 8.3cqw !important;
+}
+
+/* Tap/click selection path from main.ts. */
+.battlefield-coordinate-layer .active-board .board-slot.empty-slot.summon-ready {
+  display: grid !important;
+}
+
+/* Drag-play path from foundation-ab-v2.ts. */
+body.ab-hand-gesture-active .battlefield-coordinate-layer .active-board .board-slot.empty-slot {
+  display: grid !important;
+  border-color: rgba(224, 180, 102, .5) !important;
+  background: radial-gradient(circle, rgba(207, 157, 82, .13), rgba(207, 157, 82, .035) 52%, transparent 72%) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 216, 145, .06), 0 0 1.1cqw rgba(211, 160, 85, .12) !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* Keep the five-slot geometry stable whenever summon targets are exposed. */
+body.ab-hand-gesture-active .battlefield-coordinate-layer .active-board .board-row {
+  display: flex !important;
+  justify-content: center !important;
+  gap: .9cqw !important;
+}
+
+/* Occupied units stay above empty target circles. */
+body.foundation-cd-enabled .battlefield-coordinate-layer .board-slot.minion.cd-battle-unit {
+  position: relative !important;
+  z-index: 3 !important;
+}
