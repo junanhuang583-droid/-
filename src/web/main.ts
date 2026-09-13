@@ -173,20 +173,35 @@ function heroPanel(playerId: PlayerId, isActive: boolean): string {
 
 function boardZone(playerId: PlayerId, isActivePanel: boolean): string {
   const player = session.state.players[playerId];
-  const board = player.board.map((minion, index) => boardSlot(playerId, minion, index, isActivePanel)).join("");
+  const occupiedCount = player.board.reduce((count, minion) => count + (minion ? 1 : 0), 0);
+  let occupiedOrder = 0;
+  const board = player.board.map((minion, index) => {
+    const visualOrder = minion ? occupiedOrder++ : null;
+    return boardSlot(playerId, minion, index, isActivePanel, visualOrder, occupiedCount);
+  }).join("");
+  const summonMode = isActivePanel && selectedHandIndex !== null && !session.handoffRequired && !animationRunning;
   return `
-    <section class="board-zone ${isActivePanel ? "active-board" : "opponent-board"}" data-battlefield-anchor="${isActivePanel ? "active-minions" : "opponent-minions"}">
+    <section class="board-zone ${isActivePanel ? "active-board" : "opponent-board"} ${summonMode ? "summon-mode" : ""}" data-battlefield-anchor="${isActivePanel ? "active-minions" : "opponent-minions"}">
       <div class="board-caption"><span>${isActivePanel ? "己方随从" : "敌方随从"}</span><small>5 格</small></div>
       <div class="board-row">${board}</div>
     </section>
   `;
 }
 
-function boardSlot(playerId: PlayerId, minion: MinionInstance | null, slotIndex: number, isActivePanel: boolean): string {
+function boardSlot(
+  playerId: PlayerId,
+  minion: MinionInstance | null,
+  slotIndex: number,
+  isActivePanel: boolean,
+  visualOrder: number | null,
+  occupiedCount: number,
+): string {
+  const logicalOffset = (slotIndex - 2) * 9.2;
   if (!minion) {
     const summonReady = isActivePanel && selectedHandIndex !== null && !session.handoffRequired && !animationRunning;
-    return `<button class="board-slot empty-slot ${summonReady ? "summon-ready" : ""}" data-empty-slot="${slotIndex}" data-battlefield-slot="${playerId}-${slotIndex + 1}" ${isActivePanel && !animationRunning ? "" : "disabled"}><span>${slotIndex + 1}</span><small>${summonReady ? "召唤" : "空位"}</small></button>`;
+    return `<button class="board-slot empty-slot ${summonReady ? "summon-ready" : ""}" style="--battle-slot-x:${logicalOffset.toFixed(2)}cqw" data-empty-slot="${slotIndex}" data-battlefield-slot="${playerId}-${slotIndex + 1}" ${isActivePanel && !animationRunning ? "" : "disabled"}><span>${slotIndex + 1}</span><small>${summonReady ? "召唤" : "空位"}</small></button>`;
   }
+  const compactOffset = ((visualOrder ?? 0) - (occupiedCount - 1) / 2) * 9.2;
   const card = catalog.cards.get(minion.cardId);
   const attack = Math.max(0, (card?.attack ?? 0) + minion.attackModifier);
   const ready = playerId === session.state.activePlayer && canMinionAttack(session, minion) && !session.handoffRequired && !animationRunning;
@@ -194,6 +209,7 @@ function boardSlot(playerId: PlayerId, minion: MinionInstance | null, slotIndex:
   const enemyTarget = playerId !== session.state.activePlayer && selectedAttackerId !== null && !session.handoffRequired && !animationRunning;
   return `
     <button class="board-slot minion ${ready ? "attack-ready" : ""} ${selected ? "selected" : ""} ${enemyTarget ? "enemy-target" : ""}"
+      style="--battle-unit-x:${compactOffset.toFixed(2)}cqw;--battle-slot-x:${logicalOffset.toFixed(2)}cqw"
       data-minion-id="${escapeHtml(minion.instanceId)}" data-owner="${playerId}" data-battlefield-slot="${playerId}-${slotIndex + 1}" ${animationRunning ? "disabled" : ""}>
       <span class="slot-number">${slotIndex + 1}</span>
       <div class="minion-art"><span>${escapeHtml((card?.name ?? minion.cardId).slice(0, 1))}</span></div>
