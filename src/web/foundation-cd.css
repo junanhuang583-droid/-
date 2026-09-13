@@ -1767,3 +1767,11 @@ body.foundation-cd-enabled .battlefield-coordinate-layer .board-slot.minion.cd-b
     top: 38cqh !important;
   }
 }
+
+
+/* Stage 0-3 final spacing pass.
+   Keep the five-slot line compact like a card battler row, but leave a little
+   more breathing room than Hearthstone-style near-touching minions. */
+.battlefield-coordinate-layer .board-row {
+  gap: .72cqw !important;
+}
