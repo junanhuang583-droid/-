@@ -105,20 +105,24 @@ function fanHand(): void {
   const count = handCards.length;
   if (count === 0) return;
 
-  const available = Math.max(260, Math.min(window.innerWidth * 0.78, 940));
-  const baseWidth = window.innerHeight <= 500 ? 78 : window.innerWidth >= 1100 ? 104 : 90;
+  const rowWidth = row.getBoundingClientRect().width;
+  const available = Math.max(260, rowWidth > 0 ? rowWidth - 12 : Math.min(window.innerWidth * 0.82, 980));
+  const baseWidth = window.innerHeight <= 500 ? 82 : window.innerWidth >= 1100 ? 104 : 92;
   const natural = count * baseWidth;
-  const overlap = count > 1 ? clamp((natural - available) / (count - 1), 0, baseWidth * 0.78) : 0;
+  const maxOverlapRatio = count >= 20 ? 0.90 : count >= 14 ? 0.84 : 0.78;
+  const overlap = count > 1 ? clamp((natural - available) / (count - 1), 0, baseWidth * maxOverlapRatio) : 0;
   const center = (count - 1) / 2;
-  const angleStep = count <= 8 ? 2.2 : count <= 13 ? 1.45 : 0.95;
+  const angleStep = count <= 8 ? 2.05 : count <= 13 ? 1.35 : count <= 20 ? 0.82 : 0.58;
+  const edgeDrop = count >= 20 ? 5 : count >= 14 ? 7 : 9;
 
   handCards.forEach((card, index) => {
     const distance = index - center;
     card.style.setProperty("--ab-width", `${baseWidth}px`);
     card.style.setProperty("--ab-overlap", index === 0 ? "0px" : `${-overlap}px`);
-    card.style.setProperty("--ab-angle", `${clamp(distance * angleStep, -10, 10)}deg`);
-    card.style.setProperty("--ab-y", `${Math.min(10, Math.abs(distance) * 1.15)}px`);
+    card.style.setProperty("--ab-angle", `${clamp(distance * angleStep, -9, 9)}deg`);
+    card.style.setProperty("--ab-y", `${Math.min(edgeDrop, Math.abs(distance) * 0.95)}px`);
     card.style.setProperty("--ab-z", String(100 - Math.round(Math.abs(distance))));
+    card.style.removeProperty("--stage04-focus-x");
   });
 }
 
@@ -154,6 +158,7 @@ function onPointerDown(event: PointerEvent): void {
     sacrificeReady: false,
   };
   source.classList.add("ab-touching");
+  applyHandFocus(source);
   try { source.setPointerCapture(event.pointerId); } catch { /* optional */ }
 }
 
@@ -528,11 +533,38 @@ function findMinion(session: NonNullable<ReturnType<typeof loadSavedSession>>, o
   return player.board.find((minion) => minion?.instanceId === instanceId) ?? player.overflowMinions.find((minion) => minion.instanceId === instanceId) ?? null;
 }
 
+function applyHandFocus(source: HTMLElement): void {
+  const row = source.parentElement;
+  if (!row) return;
+  const cards = [...row.querySelectorAll<HTMLElement>(".hand-card")];
+  const sourceIndex = cards.indexOf(source);
+  if (sourceIndex < 0 || cards.length < 8) return;
+
+  const maxShift = cards.length >= 20 ? 28 : cards.length >= 14 ? 22 : 16;
+  cards.forEach((card, index) => {
+    const delta = index - sourceIndex;
+    if (delta === 0) {
+      card.style.setProperty("--stage04-focus-x", "0px");
+      return;
+    }
+    const distance = Math.abs(delta);
+    const shift = Math.max(0, maxShift - (distance - 1) * 6);
+    card.style.setProperty("--stage04-focus-x", `${delta < 0 ? -shift : shift}px`);
+  });
+}
+
+function clearHandFocus(): void {
+  document.querySelectorAll<HTMLElement>("#active-hand-target .hand-card").forEach((card) => {
+    card.style.removeProperty("--stage04-focus-x");
+  });
+}
+
 function cleanupGesture(): void {
   if (!gesture) return;
   if (gestureFrame) cancelAnimationFrame(gestureFrame);
   gestureFrame = 0;
   gesture.source.classList.remove("ab-touching", "ab-drag-source");
+  clearHandFocus();
   clearDropTarget(gesture);
   gesture.ghost?.remove();
   document.body.classList.remove("ab-hand-peek-active", "ab-hand-gesture-active");
