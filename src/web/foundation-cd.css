@@ -1775,3 +1775,32 @@ body.foundation-cd-enabled .battlefield-coordinate-layer .board-slot.minion.cd-b
 .battlefield-coordinate-layer .board-row {
   gap: .72cqw !important;
 }
+
+
+/* Stage 0-3 actual-unit compact row.
+   Logical board slots remain five. Outside summon targeting, empty logical
+   slots do not consume visual spacing, so occupied minions form a centered
+   compact line. During summon targeting the five legal positions reappear. */
+.battlefield-coordinate-layer .board-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: .9cqw !important;
+}
+
+.battlefield-coordinate-layer .opponent-board .board-slot.empty-slot {
+  display: none !important;
+}
+
+.battlefield-coordinate-layer .active-board .board-slot.empty-slot:not(.summon-ready) {
+  display: none !important;
+}
+
+.battlefield-coordinate-layer .active-board .board-slot.empty-slot.summon-ready {
+  display: grid !important;
+  flex: 0 0 8.3cqw !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .board-slot.minion.cd-battle-unit {
+  flex: 0 0 8.3cqw !important;
+}
