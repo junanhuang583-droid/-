@@ -1,7 +1,5 @@
-const CACHE_NAME = "card-game-shell-v3";
+const CACHE_NAME = "card-game-shell-v4";
 const CORE_ASSETS = [
-  "./",
-  "./index.html",
   "./manifest.webmanifest",
   "./icon.svg",
   "./icon-192.png",
@@ -33,6 +31,19 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
+  if (request.mode === "navigate") {
+    event.respondWith((async () => {
+      try {
+        return await fetch(request, { cache: "no-store" });
+      } catch {
+        const cache = await caches.open(CACHE_NAME);
+        const fallback = await cache.match("./index.html");
+        return fallback ?? Response.error();
+      }
+    })());
+    return;
+  }
+
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);
     try {
@@ -40,13 +51,7 @@ self.addEventListener("fetch", (event) => {
       if (response.ok) await cache.put(request, response.clone());
       return response;
     } catch {
-      const cached = await cache.match(request);
-      if (cached) return cached;
-      if (request.mode === "navigate") {
-        const fallback = await cache.match("./index.html");
-        if (fallback) return fallback;
-      }
-      return Response.error();
+      return (await cache.match(request)) ?? Response.error();
     }
   })());
 });
