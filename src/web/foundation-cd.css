@@ -1577,3 +1577,193 @@ body.foundation-cd-enabled .battlefield-coordinate-layer .active-board .board-sl
     height: clamp(38px, 5cqw, 54px) !important;
   }
 }
+
+
+/* Stage 0-3 rework: full-field coordinates.
+   The previous pass positioned battlefield objects inside the old cropped
+   battle-shell and also left legacy top/bottom constraints active. This pass
+   makes battle-shell the full 16:9 coordinate plane and explicitly clears the
+   old constraints before placing both sides. */
+
+.battlefield-coordinate-layer > .battle-shell {
+  position: absolute !important;
+  inset: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+
+/* Enemy stays entirely in the upper half; active player stays entirely in the
+   lower half. Perspective still follows the active hot-seat player. */
+.battlefield-coordinate-layer .opponent-hero {
+  left: 50% !important;
+  top: 3.2cqh !important;
+  bottom: auto !important;
+}
+
+.battlefield-coordinate-layer .active-hero {
+  left: 50% !important;
+  top: 62cqh !important;
+  bottom: auto !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .opponent-board,
+.battlefield-coordinate-layer .opponent-board {
+  left: 50% !important;
+  top: 14.5cqh !important;
+  bottom: auto !important;
+  height: 15cqh !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .active-board,
+.battlefield-coordinate-layer .active-board {
+  left: 50% !important;
+  top: 45.5cqh !important;
+  bottom: auto !important;
+  height: 15cqh !important;
+}
+
+/* The midpoint remains clear for the scene lane and visual center line. */
+.battlefield-coordinate-layer .scene-lane {
+  left: 50% !important;
+  top: 36.7cqh !important;
+  bottom: auto !important;
+  width: 40cqw !important;
+  height: 4.6cqh !important;
+}
+
+/* Keep all ten logical slots as two stable five-slot rows. */
+.battlefield-coordinate-layer .board-row {
+  grid-template-columns: repeat(5, 8.3cqw) !important;
+  gap: 1.35cqw !important;
+}
+
+.battlefield-coordinate-layer .board-slot.empty-slot,
+body.foundation-cd-enabled .battlefield-coordinate-layer .board-slot.minion.cd-battle-unit {
+  width: 8.3cqw !important;
+  height: 13.2cqh !important;
+}
+
+/* Summon affordances belong only to the active player's lower row. Enemy empty
+   slots never glow just because a hand card is selected. */
+.battlefield-coordinate-layer .opponent-board .board-slot.empty-slot {
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.battlefield-coordinate-layer .active-board .board-slot.empty-slot.summon-ready {
+  border-color: rgba(224, 180, 102, .48) !important;
+  background: radial-gradient(circle, rgba(207, 157, 82, .12), rgba(207, 157, 82, .03) 54%, transparent 72%) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 216, 145, .05), 0 0 1cqw rgba(211, 160, 85, .11) !important;
+}
+
+/* Deck and turn controls are independent anchors now: deck on the left,
+   End Turn / New Game on the right. The old shared rail panel no longer owns
+   their geometry, so the two groups cannot overlap. */
+.battlefield-coordinate-layer .battle-rail {
+  position: absolute !important;
+  z-index: 10 !important;
+  inset: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  pointer-events: none !important;
+}
+
+.battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="shared-deck"] {
+  position: absolute !important;
+  left: 1.5cqw !important;
+  right: auto !important;
+  top: 37cqh !important;
+  bottom: auto !important;
+  width: 10.5cqw !important;
+  min-width: 0 !important;
+  padding: .65cqw !important;
+  gap: .35cqh !important;
+  border: 1px solid rgba(91, 72, 52, .38);
+  border-radius: 1cqw;
+  background: rgba(19, 17, 15, .62);
+  box-shadow: 0 .65cqw 1.6cqw rgba(0, 0, 0, .20);
+  pointer-events: auto !important;
+}
+
+.battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="shared-deck"] .deck-stack {
+  width: clamp(34px, 4.2cqw, 52px) !important;
+}
+
+.battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="shared-deck"] .rail-label,
+.battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="shared-deck"] small {
+  font-size: clamp(6px, .58cqw, 8px) !important;
+}
+
+.battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="shared-deck"] strong {
+  font-size: clamp(9px, .9cqw, 12px) !important;
+}
+
+.battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] {
+  position: absolute !important;
+  left: auto !important;
+  right: 1.5cqw !important;
+  top: 39cqh !important;
+  bottom: auto !important;
+  width: 10.8cqw !important;
+  display: grid !important;
+  gap: .8cqh !important;
+  pointer-events: auto !important;
+}
+
+.battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .primary-button,
+.battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .secondary-button {
+  width: 100% !important;
+  min-height: 5.6cqh !important;
+  padding: .55cqh .65cqw !important;
+  border-radius: 1cqw !important;
+  font-size: clamp(8px, .82cqw, 11px) !important;
+}
+
+@media (orientation: landscape) and (max-height: 460px) {
+  .battlefield-coordinate-layer .opponent-hero {
+    top: 2.4cqh !important;
+  }
+
+  .battlefield-coordinate-layer .active-hero {
+    top: 63cqh !important;
+  }
+
+  body.foundation-cd-enabled .battlefield-coordinate-layer .opponent-board,
+  .battlefield-coordinate-layer .opponent-board {
+    top: 13.5cqh !important;
+    bottom: auto !important;
+  }
+
+  body.foundation-cd-enabled .battlefield-coordinate-layer .active-board,
+  .battlefield-coordinate-layer .active-board {
+    top: 46cqh !important;
+    bottom: auto !important;
+  }
+
+  .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="shared-deck"] {
+    top: 36cqh !important;
+  }
+
+  .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] {
+    top: 38cqh !important;
+  }
+}
