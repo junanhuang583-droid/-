@@ -40,6 +40,8 @@ let gesture: HandGesture | null = null;
 let gestureFrame = 0;
 let scheduled = false;
 let bypassMinionInspector = false;
+let handExpanded = false;
+let lastActivePlayer: PlayerId | null = null;
 
 document.body.classList.add("foundation-ab-enabled", "foundation-ab-v2-enabled");
 const app = document.querySelector("#app") ?? document.body;
@@ -47,10 +49,12 @@ new MutationObserver(scheduleSync).observe(app, { childList: true, subtree: true
 window.addEventListener("resize", scheduleSync);
 window.addEventListener("storage", scheduleSync);
 window.addEventListener("cardgame:session-updated", scheduleSync);
+document.addEventListener("pointerdown", onGlobalHandPointerDown, true);
 document.addEventListener("pointerdown", onPointerDown, true);
 document.addEventListener("pointermove", onPointerMove, { capture: true, passive: false });
 document.addEventListener("pointerup", onPointerUp, true);
 document.addEventListener("pointercancel", onPointerCancel, true);
+document.addEventListener("click", onHandToggleClick, true);
 document.addEventListener("click", onMinionClick, true);
 document.addEventListener("click", suppressLegacyHandClick, true);
 document.addEventListener("click", closeInspectorFromOutside, true);
@@ -72,6 +76,9 @@ function syncFoundation(): void {
 
   const active = session.state.activePlayer;
   const opponent = otherPlayer(active);
+  if (lastActivePlayer !== null && lastActivePlayer !== active) handExpanded = false;
+  lastActivePlayer = active;
+  syncHandExpandedState();
   shell.classList.add("foundation-ab-shell");
   shell.classList.toggle("foundation-active-p1", active === "P1");
   shell.classList.toggle("foundation-active-p2", active === "P2");
@@ -142,6 +149,7 @@ function onPointerDown(event: PointerEvent): void {
   if (!cardId) return;
 
   closeMinionInspector();
+  setHandExpanded(true);
   gesture = {
     pointerId: event.pointerId,
     source,
@@ -376,6 +384,38 @@ function frameClassForSeries(series: string | null | undefined): string {
   return "ef-series-base";
 }
 
+function onHandToggleClick(event: MouseEvent): void {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const toggle = target.closest<HTMLElement>(".stage04-hand-toggle");
+  if (!toggle) return;
+  event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation();
+  setHandExpanded(!handExpanded);
+}
+
+function onGlobalHandPointerDown(event: PointerEvent): void {
+  if (!handExpanded || gesture) return;
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (target.closest(".hand-dock, .ab-lift-card")) return;
+  setHandExpanded(false);
+}
+
+function setHandExpanded(expanded: boolean): void {
+  handExpanded = expanded;
+  syncHandExpandedState();
+  requestAnimationFrame(fanHand);
+}
+
+function syncHandExpandedState(): void {
+  document.body.classList.toggle("stage04-hand-expanded", handExpanded);
+  const toggle = document.querySelector<HTMLElement>(".stage04-hand-toggle");
+  toggle?.setAttribute("aria-expanded", handExpanded ? "true" : "false");
+  toggle?.classList.toggle("is-expanded", handExpanded);
+}
+
 function suppressLegacyHandClick(event: MouseEvent): void {
   const target = event.target;
   if (!(target instanceof Element) || !target.closest(".hand-card")) return;
@@ -561,6 +601,7 @@ function clearHandFocus(): void {
 
 function cleanupGesture(): void {
   if (!gesture) return;
+  const collapseAfterPlay = gesture.lifted && gesture.mode === "play";
   if (gestureFrame) cancelAnimationFrame(gestureFrame);
   gestureFrame = 0;
   gesture.source.classList.remove("ab-touching", "ab-drag-source");
@@ -570,6 +611,7 @@ function cleanupGesture(): void {
   document.body.classList.remove("ab-hand-peek-active", "ab-hand-gesture-active");
   try { gesture.source.releasePointerCapture(gesture.pointerId); } catch { /* optional */ }
   gesture = null;
+  if (collapseAfterPlay) setHandExpanded(false);
 }
 
 function resolveHandIndex(source: HTMLElement): number {
