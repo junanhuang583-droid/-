@@ -5,13 +5,14 @@
   "type": "module",
   "scripts": {
     "generate:icons": "node scripts/generate-pwa-icons.mjs",
-    "predev": "npm run generate:icons",
+    "predev": "npm run generate:icons && npm run materialize:battlefield",
     "dev": "vite",
-    "prebuild": "npm run generate:icons",
+    "prebuild": "npm run generate:icons && npm run materialize:battlefield",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "materialize:battlefield": "node scripts/materialize-battlefield.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
