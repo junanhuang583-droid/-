@@ -1,4 +1,4 @@
-const CACHE_NAME = "card-game-shell-v2";
+const CACHE_NAME = "card-game-shell-v3";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -6,6 +6,7 @@ const CORE_ASSETS = [
   "./icon.svg",
   "./icon-192.png",
   "./icon-512.png",
+  "./assets/battlefield/gothic-abyss.webp",
 ];
 
 self.addEventListener("install", (event) => {
