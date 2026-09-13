@@ -1,0 +1,29 @@
+#battlefield-background {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: #03070b;
+}
+
+#battlefield-background > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 50%;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+#app {
+  position: relative;
+  z-index: 1;
+}
+
+@media (min-aspect-ratio: 2/1) {
+  #battlefield-background > img {
+    object-fit: contain;
+  }
+}
