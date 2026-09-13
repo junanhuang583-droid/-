@@ -79,11 +79,14 @@ function render(): void {
 
       <section class="status-toast ${notice ? "show" : ""}">${escapeHtml(notice)}</section>
 
-      <section class="battle-shell">
+      <section class="battlefield-viewport" aria-label="战场">
+        <div class="battlefield-coordinate-layer" data-battlefield-design="1152x648">
+          <div class="battlefield-future-anchor" data-battlefield-anchor="discard-future" aria-hidden="true"></div>
+          <section class="battle-shell">
         ${heroPanel(opponent, false)}
         ${boardZone(opponent, false)}
 
-        <section class="scene-lane">
+        <section class="scene-lane" data-battlefield-anchor="scene">
           <div class="scene-placeholder">
             <span>场景区</span>
             <small>${selectedAttackerId ? `已选择攻击者，点击敌方随从或${playerLabel(opponent)}英雄` : "战场中央 / 场景牌以后显示在这里"}</small>
@@ -93,8 +96,8 @@ function render(): void {
         ${heroPanel(active, true)}
         ${boardZone(active, true)}
 
-        <aside class="battle-rail">
-          <div class="rail-group">
+        <aside class="battle-rail" data-battlefield-anchor="right-rail">
+          <div class="rail-group" data-battlefield-anchor="shared-deck">
             <span class="rail-label">共享牌库</span>
             <div id="deck-source" class="deck-stack" aria-label="共享牌库">
               <span class="deck-card deck-card-back"></span>
@@ -105,14 +108,14 @@ function render(): void {
             <small>${catalog.playableUniqueCards} 种可运行随从</small>
             <small>P1 弃牌 ${state.players.P1.discardPile.length} · P2 弃牌 ${state.players.P2.discardPile.length}</small>
           </div>
-          <div class="rail-actions">
+          <div class="rail-actions" data-battlefield-anchor="turn-actions">
             <button id="end-turn" class="primary-button turn-button" ${state.winner || interactionLocked ? "disabled" : ""}>结束回合</button>
             <button class="secondary-button" data-new-game="confirm" ${interactionLocked ? "disabled" : ""}>新对局</button>
           </div>
         </aside>
       </section>
 
-      <section class="hand-dock">
+      <section class="hand-dock" data-battlefield-anchor="hand-dock">
         <div class="hand-heading">
           <strong>${playerLabel(active)}手牌</strong>
           <span>${activeState.hand.length} 张</span>
@@ -120,6 +123,8 @@ function render(): void {
         </div>
         <div class="hand-row" id="active-hand-target">
           ${activeState.hand.map((cardId, index) => handCard(cardId, index, activeState.hand.length)).join("") || `<div class="empty-state">暂无手牌</div>`}
+        </div>
+      </section>
         </div>
       </section>
 
@@ -154,7 +159,7 @@ function heroPanel(playerId: PlayerId, isActive: boolean): string {
   const tag = isTarget ? "button" : "div";
   const targetAttrs = isTarget ? `data-hero-target="${playerId}"` : "";
   return `
-    <${tag} class="hero-panel ${isActive ? "active-hero" : "opponent-hero"} ${isTarget ? "hero-target-ready" : ""}" ${targetAttrs}>
+    <${tag} class="hero-panel ${isActive ? "active-hero" : "opponent-hero"} ${isTarget ? "hero-target-ready" : ""}" data-battlefield-anchor="${isActive ? "active-hero" : "opponent-hero"}" ${targetAttrs}>
       <div class="hero-portrait"><span>${playerId === "P1" ? "1" : "2"}</span></div>
       <div class="hero-copy">
         <span>${playerLabel(playerId)}</span>
@@ -170,7 +175,7 @@ function boardZone(playerId: PlayerId, isActivePanel: boolean): string {
   const player = session.state.players[playerId];
   const board = player.board.map((minion, index) => boardSlot(playerId, minion, index, isActivePanel)).join("");
   return `
-    <section class="board-zone ${isActivePanel ? "active-board" : "opponent-board"}">
+    <section class="board-zone ${isActivePanel ? "active-board" : "opponent-board"}" data-battlefield-anchor="${isActivePanel ? "active-minions" : "opponent-minions"}">
       <div class="board-caption"><span>${isActivePanel ? "己方随从" : "敌方随从"}</span><small>5 格</small></div>
       <div class="board-row">${board}</div>
     </section>
@@ -180,7 +185,7 @@ function boardZone(playerId: PlayerId, isActivePanel: boolean): string {
 function boardSlot(playerId: PlayerId, minion: MinionInstance | null, slotIndex: number, isActivePanel: boolean): string {
   if (!minion) {
     const summonReady = isActivePanel && selectedHandIndex !== null && !session.handoffRequired && !animationRunning;
-    return `<button class="board-slot empty-slot ${summonReady ? "summon-ready" : ""}" data-empty-slot="${slotIndex}" ${isActivePanel && !animationRunning ? "" : "disabled"}><span>${slotIndex + 1}</span><small>${summonReady ? "召唤" : "空位"}</small></button>`;
+    return `<button class="board-slot empty-slot ${summonReady ? "summon-ready" : ""}" data-empty-slot="${slotIndex}" data-battlefield-slot="${playerId}-${slotIndex + 1}" ${isActivePanel && !animationRunning ? "" : "disabled"}><span>${slotIndex + 1}</span><small>${summonReady ? "召唤" : "空位"}</small></button>`;
   }
   const card = catalog.cards.get(minion.cardId);
   const attack = Math.max(0, (card?.attack ?? 0) + minion.attackModifier);
@@ -189,7 +194,7 @@ function boardSlot(playerId: PlayerId, minion: MinionInstance | null, slotIndex:
   const enemyTarget = playerId !== session.state.activePlayer && selectedAttackerId !== null && !session.handoffRequired && !animationRunning;
   return `
     <button class="board-slot minion ${ready ? "attack-ready" : ""} ${selected ? "selected" : ""} ${enemyTarget ? "enemy-target" : ""}"
-      data-minion-id="${escapeHtml(minion.instanceId)}" data-owner="${playerId}" ${animationRunning ? "disabled" : ""}>
+      data-minion-id="${escapeHtml(minion.instanceId)}" data-owner="${playerId}" data-battlefield-slot="${playerId}-${slotIndex + 1}" ${animationRunning ? "disabled" : ""}>
       <span class="slot-number">${slotIndex + 1}</span>
       <div class="minion-art"><span>${escapeHtml((card?.name ?? minion.cardId).slice(0, 1))}</span></div>
       <strong>${escapeHtml(card?.name ?? minion.cardId)}</strong>
