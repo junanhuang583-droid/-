@@ -46,9 +46,11 @@ if (document.readyState === "loading") {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     const swUrl = new URL("./sw.js", window.location.href);
-    void navigator.serviceWorker.register(swUrl).catch(() => {
-      // PWA support is optional. The browser game remains usable if registration fails.
-    });
+    void navigator.serviceWorker.register(swUrl, { updateViaCache: "none" })
+      .then((registration) => registration.update())
+      .catch(() => {
+        // PWA support is optional. The browser game remains usable if registration fails.
+      });
   });
 }
 
