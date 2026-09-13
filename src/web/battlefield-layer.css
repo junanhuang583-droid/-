@@ -21,9 +21,3 @@
   position: relative;
   z-index: 1;
 }
-
-@media (min-aspect-ratio: 2/1) {
-  #battlefield-background > img {
-    object-fit: contain;
-  }
-}
