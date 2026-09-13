@@ -116,6 +116,9 @@ function render(): void {
       </section>
 
       <section class="hand-dock" data-battlefield-anchor="hand-dock">
+        <button class="stage04-hand-toggle" type="button" aria-expanded="false">
+          <span>手牌</span><strong>${activeState.hand.length}</strong>
+        </button>
         <div class="hand-heading">
           <strong>${playerLabel(active)}手牌</strong>
           <span>${activeState.hand.length} 张</span>
