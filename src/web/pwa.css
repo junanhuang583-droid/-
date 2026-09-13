@@ -240,3 +240,18 @@ body.pwa-standalone .pwa-controls {
     grid-template-rows: minmax(0, 1fr) 48px minmax(0, 1fr);
   }
 }
+
+
+/* Stage 0-2: fullscreen/PWA must keep the shared battlefield coordinate grid.
+   Legacy mode-specific grid sizing is intentionally neutralized here. */
+body.is-fullscreen .game-shell,
+body.pwa-standalone .game-shell {
+  padding: 0 !important;
+}
+
+body.is-fullscreen .battlefield-coordinate-layer > .battle-shell,
+body.pwa-standalone .battlefield-coordinate-layer > .battle-shell {
+  grid-template-columns: 13.5cqw minmax(0, 1fr) 14.5cqw !important;
+  grid-template-rows: minmax(0, 1fr) 5cqh minmax(0, 1fr) !important;
+  gap: .65cqw !important;
+}
