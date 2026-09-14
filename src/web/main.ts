@@ -89,7 +89,7 @@ function render(): void {
         <section class="scene-lane" data-battlefield-anchor="scene">
           <div class="scene-placeholder">
             <span>场景</span>
-            <small>${selectedAttackerId ? `已选择攻击者，点击敌方随从或${playerLabel(opponent)}英雄` : "战场中央 / 场景牌以后显示在这里"}</small>
+            <small>${selectedAttackerId ? `已选择攻击者，点击敌方随从或${playerLabel(opponent)}英雄` : ""}</small>
           </div>
         </section>
 
