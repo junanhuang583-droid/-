@@ -88,7 +88,7 @@ function render(): void {
 
         <section class="scene-lane" data-battlefield-anchor="scene">
           <div class="scene-placeholder">
-            <span>场景区</span>
+            <span>场景</span>
             <small>${selectedAttackerId ? `已选择攻击者，点击敌方随从或${playerLabel(opponent)}英雄` : "战场中央 / 场景牌以后显示在这里"}</small>
           </div>
         </section>
@@ -98,7 +98,7 @@ function render(): void {
 
         <aside class="battle-rail" data-battlefield-anchor="right-rail">
           <div class="rail-group" data-battlefield-anchor="shared-deck">
-            <span class="rail-label">共享牌库</span>
+            <span class="rail-label">牌库</span>
             <div id="deck-source" class="deck-stack" aria-label="共享牌库">
               <span class="deck-card deck-card-back"></span>
               <span class="deck-card deck-card-mid"></span>
