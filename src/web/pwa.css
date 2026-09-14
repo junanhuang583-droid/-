@@ -191,7 +191,11 @@ body.is-fullscreen .pwa-controls {
 }
 
 body.pwa-standalone .pwa-controls {
-  display: none;
+  display: flex;
+}
+
+.pwa-control-button.is-installed {
+  opacity: .72;
 }
 
 @media (orientation: landscape) and (max-height: 520px) {
