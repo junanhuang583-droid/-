@@ -2146,3 +2146,96 @@ body.foundation-cd-enabled.foundation-ab-enabled.ab-hand-gesture-active .battlef
     --stage04-focus-lift: 26px;
   }
 }
+
+
+/* Stage 0-5 final battlefield layout lock.
+   Final Stage 0 composition requested by the project owner:
+   opponent hero top-center; PWA controls top-right; opponent line above center;
+   deck left / scene center / turn controls right; active line below center;
+   active hero above the collapsed hand. */
+body.foundation-cd-enabled .debug-drawer {
+  display: none !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="shared-deck"] {
+  left: 1.6cqw !important;
+  right: auto !important;
+  top: 36.2cqh !important;
+  width: 8.8cqw !important;
+  min-width: 0 !important;
+  padding: .5cqw .45cqw !important;
+  gap: .25cqh !important;
+  border-color: rgba(112, 88, 57, .28) !important;
+  background: rgba(18, 16, 14, .48) !important;
+  box-shadow: 0 .45cqw 1.2cqw rgba(0,0,0,.18) !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="shared-deck"] small {
+  display: none !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="shared-deck"] .rail-label {
+  font-size: clamp(7px, .66cqw, 9px) !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="shared-deck"] strong {
+  font-size: clamp(9px, .9cqw, 12px) !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .scene-lane {
+  left: 50% !important;
+  top: 36.2cqh !important;
+  width: 34cqw !important;
+  height: 4.6cqh !important;
+  transform: translateX(-50%) !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .scene-placeholder {
+  min-width: 8.5cqw !important;
+  max-width: 34cqw !important;
+  padding: .35cqh .8cqw !important;
+  border-color: rgba(126, 95, 59, .28) !important;
+  background: rgba(22, 18, 15, .42) !important;
+  box-shadow: none !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .scene-placeholder span {
+  font-size: clamp(7px, .66cqw, 9px) !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .scene-placeholder small:empty {
+  display: none !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] {
+  left: auto !important;
+  right: 1.6cqw !important;
+  top: 36.2cqh !important;
+  bottom: auto !important;
+  width: 10.8cqw !important;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: .8cqh !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .primary-button,
+body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .secondary-button {
+  width: 100% !important;
+  margin: 0 !important;
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="shared-deck"],
+  body.foundation-cd-enabled .battlefield-coordinate-layer .scene-lane,
+  body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] {
+    top: 35.5cqh !important;
+  }
+
+  body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="shared-deck"] {
+    width: 8.4cqw !important;
+  }
+
+  body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] {
+    width: 10.4cqw !important;
+  }
+}
