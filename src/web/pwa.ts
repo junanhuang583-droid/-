@@ -186,12 +186,13 @@ function syncControls(): void {
 
   if (fullscreenButton) {
     fullscreenButton.textContent = fullscreen ? "退出全屏" : "⛶ 全屏";
-    fullscreenButton.hidden = standalone && !document.fullscreenElement;
+    fullscreenButton.hidden = false;
   }
   if (installButton) {
-    installButton.hidden = standalone;
-    installButton.textContent = installPrompt ? "＋ 安装" : "安装方法";
-    installButton.classList.toggle("install-ready", installPrompt !== null);
+    installButton.hidden = false;
+    installButton.textContent = standalone ? "已安装" : installPrompt ? "＋ 安装" : "安装";
+    installButton.classList.toggle("install-ready", !standalone && installPrompt !== null);
+    installButton.classList.toggle("is-installed", standalone);
   }
 }
 
