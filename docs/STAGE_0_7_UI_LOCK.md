@@ -36,7 +36,8 @@
 正式运行时资产：
 - 路径：`src/web/assets/ui-stage07/end-turn-device.webp`
 - 尺寸：721×360
-- SHA-256：`0b8281d582c16ef5a849ac50a4e3d1e3a1e738268cbcdfdad73247e64edbcf9d`
+- SHA-256：`dedff0552daac903a5c5a6e57c77dffb8e4c1e97affaca8c6c0cd98322b3e72e`
+- 构建前由 `npm run materialize:stage07-ui` 从 8 个源码分块重建，并强制校验字节数、SHA-256 与 RIFF/WEBP 头，防止二进制资产再次静默损坏。
 
 ### 左侧牌库
 - 使用批准的半嵌入式石制 / 黑铁卡槽概念。
