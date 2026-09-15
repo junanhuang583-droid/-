@@ -112,7 +112,7 @@ function render(): void {
             <small>P1 弃牌 ${state.players.P1.discardPile.length} · P2 弃牌 ${state.players.P2.discardPile.length}</small>
           </div>
           <div class="rail-actions" data-battlefield-anchor="turn-actions">
-            <button id="end-turn" class="primary-button turn-button" ${state.winner || interactionLocked ? "disabled" : ""}>结束回合</button>
+            <button id="end-turn" class="primary-button turn-button stage07-end-turn-device" data-stage07-control="end-turn" aria-label="结束回合" ${state.winner || interactionLocked ? "disabled" : ""}>结束回合</button>
           </div>
         </aside>
       </section>
