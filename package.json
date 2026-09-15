@@ -5,14 +5,15 @@
   "type": "module",
   "scripts": {
     "generate:icons": "node scripts/generate-pwa-icons.mjs",
-    "predev": "npm run generate:icons && npm run materialize:battlefield",
+    "predev": "npm run generate:icons && npm run materialize:battlefield && npm run materialize:stage07-ui",
     "dev": "vite",
-    "prebuild": "npm run generate:icons && npm run materialize:battlefield",
+    "prebuild": "npm run generate:icons && npm run materialize:battlefield && npm run materialize:stage07-ui",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "materialize:battlefield": "node scripts/materialize-battlefield.mjs"
+    "materialize:battlefield": "node scripts/materialize-battlefield.mjs",
+    "materialize:stage07-ui": "node scripts/materialize-stage07-ui.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
