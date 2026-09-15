@@ -85,6 +85,9 @@ function render(): void {
           <div class="stage07-utility-actions" data-battlefield-anchor="utility-actions">
             <button class="secondary-button" data-new-game="confirm" ${interactionLocked ? "disabled" : ""}>新对局</button>
           </div>
+          <div class="battlefield-fusion-layer" aria-hidden="true">
+            <div class="stage072b-end-turn-socket" data-battlefield-anchor="end-turn-socket"></div>
+          </div>
           <section class="battle-shell">
         ${heroPanel(opponent, false)}
         ${boardZone(opponent, false)}
