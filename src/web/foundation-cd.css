@@ -2263,3 +2263,107 @@ body.foundation-cd-enabled .battlefield-coordinate-layer .stage07-utility-action
     right: max(132px, 11.2cqw);
   }
 }
+
+
+/* Stage 0-7.2 end-turn device integration.
+   Keep the real button and its existing game logic/hit target, but replace the
+   webpage control skin with the approved gothic battlefield mechanism. */
+body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] {
+  overflow: visible !important;
+  align-items: start !important;
+  justify-items: end !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .turn-button.stage07-end-turn-device {
+  position: relative !important;
+  display: block !important;
+  width: 9.2cqw !important;
+  height: auto !important;
+  aspect-ratio: 721 / 360 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background-color: transparent !important;
+  background-image: url("./assets/ui-stage07/end-turn-device.webp") !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: contain !important;
+  box-shadow: none !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  text-shadow: none !important;
+  overflow: visible !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+  -webkit-tap-highlight-color: transparent !important;
+  transform: translateX(10%) !important;
+  transform-origin: center right !important;
+  filter:
+    saturate(.95)
+    brightness(.96)
+    drop-shadow(0 .42cqh .52cqh rgba(0,0,0,.50))
+    drop-shadow(0 0 .18cqw rgba(194,127,50,.16)) !important;
+  transition:
+    transform .12s cubic-bezier(.2,.75,.25,1),
+    filter .14s ease,
+    opacity .14s ease !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .turn-button.stage07-end-turn-device:not(:disabled):hover {
+  transform: translateX(10%) translateY(-1px) scale(1.015) !important;
+  filter:
+    saturate(1.06)
+    brightness(1.07)
+    drop-shadow(0 .48cqh .58cqh rgba(0,0,0,.54))
+    drop-shadow(0 0 .32cqw rgba(220,150,61,.28)) !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .turn-button.stage07-end-turn-device:not(:disabled):active {
+  transform: translateX(11%) translateY(2px) scale(.965) !important;
+  filter:
+    saturate(1.08)
+    brightness(1.12)
+    drop-shadow(0 .22cqh .32cqh rgba(0,0,0,.44))
+    drop-shadow(0 0 .36cqw rgba(230,157,63,.32)) !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .turn-button.stage07-end-turn-device:disabled {
+  opacity: .80 !important;
+  cursor: not-allowed !important;
+  filter:
+    saturate(.24)
+    brightness(.54)
+    contrast(.94)
+    drop-shadow(0 .34cqh .42cqh rgba(0,0,0,.46)) !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .turn-button.stage07-end-turn-device:focus-visible {
+  outline: 2px solid rgba(236,190,112,.86) !important;
+  outline-offset: 2px !important;
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .turn-button.stage07-end-turn-device {
+    width: 8.8cqw !important;
+    transform: translateX(9%) !important;
+  }
+
+  body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .turn-button.stage07-end-turn-device:not(:disabled):hover {
+    transform: translateX(9%) translateY(-1px) scale(1.012) !important;
+  }
+
+  body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .turn-button.stage07-end-turn-device:not(:disabled):active {
+    transform: translateX(10%) translateY(1px) scale(.97) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .turn-button.stage07-end-turn-device {
+    transition: none !important;
+  }
+}
