@@ -2383,33 +2383,35 @@ body.foundation-cd-enabled .battlefield-coordinate-layer > .battlefield-fusion-l
 
 body.foundation-cd-enabled .battlefield-coordinate-layer .stage072b-end-turn-socket {
   position: absolute !important;
-  right: -.35cqw !important;
-  top: 34.75cqh !important;
-  width: 13.1cqw !important;
-  height: 11.4cqh !important;
-  clip-path: polygon(0 18%, 13% 0, 100% 0, 100% 100%, 13% 100%, 0 82%) !important;
+  right: -1.25cqw !important;
+  top: 35.25cqh !important;
+  width: 12.2cqw !important;
+  height: 9.5cqh !important;
+  clip-path: polygon(0 24%, 12% 10%, 32% 3%, 100% 0, 100% 100%, 32% 97%, 12% 90%, 0 76%) !important;
   background:
     linear-gradient(90deg,
-      rgba(12, 11, 10, .82) 0%,
-      rgba(28, 24, 21, .76) 28%,
-      rgba(45, 35, 27, .42) 62%,
-      rgba(10, 9, 9, .88) 100%) !important;
-  border-left: 1px solid rgba(174, 129, 77, .26) !important;
+      rgba(18, 15, 12, 0) 0%,
+      rgba(18, 15, 12, .18) 18%,
+      rgba(17, 14, 12, .56) 62%,
+      rgba(8, 8, 8, .82) 100%) !important;
+  border-left: 1px solid rgba(174, 129, 77, .14) !important;
   box-shadow:
-    inset .28cqw 0 .42cqw rgba(203, 147, 82, .09),
-    inset 0 .36cqh .56cqh rgba(0, 0, 0, .52),
-    inset 0 -.42cqh .62cqh rgba(0, 0, 0, .68),
-    -.45cqw .28cqh 1.05cqw rgba(0, 0, 0, .36) !important;
-  opacity: .96 !important;
+    inset .20cqw 0 .34cqw rgba(203, 147, 82, .06),
+    inset 0 .24cqh .42cqh rgba(0, 0, 0, .34),
+    inset 0 -.30cqh .48cqh rgba(0, 0, 0, .50),
+    -.26cqw .18cqh .68cqw rgba(0, 0, 0, .22) !important;
+  backdrop-filter: blur(.35px) brightness(.78) saturate(.86) !important;
+  -webkit-backdrop-filter: blur(.35px) brightness(.78) saturate(.86) !important;
+  opacity: .92 !important;
 }
 
 body.foundation-cd-enabled .battlefield-coordinate-layer .stage072b-end-turn-socket::before,
 body.foundation-cd-enabled .battlefield-coordinate-layer .stage072b-end-turn-socket::after {
   content: "" !important;
   position: absolute !important;
-  left: 8% !important;
+  left: 22% !important;
   right: -2% !important;
-  height: .42cqh !important;
+  height: .28cqh !important;
   background:
     linear-gradient(180deg,
       rgba(170, 121, 68, .20),
@@ -2418,15 +2420,15 @@ body.foundation-cd-enabled .battlefield-coordinate-layer .stage072b-end-turn-soc
   box-shadow:
     0 1px 0 rgba(216, 160, 92, .08),
     0 .24cqh .34cqh rgba(0, 0, 0, .42) !important;
-  opacity: .88 !important;
+  opacity: .62 !important;
 }
 
 body.foundation-cd-enabled .battlefield-coordinate-layer .stage072b-end-turn-socket::before {
-  top: 10% !important;
+  top: 9% !important;
 }
 
 body.foundation-cd-enabled .battlefield-coordinate-layer .stage072b-end-turn-socket::after {
-  bottom: 10% !important;
+  bottom: 9% !important;
   transform: scaleY(-1) !important;
 }
 
@@ -2436,8 +2438,8 @@ body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-batt
 }
 
 body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .turn-button.stage07-end-turn-device {
-  width: 8.75cqw !important;
-  transform: translateX(15%) !important;
+  width: 8.6cqw !important;
+  transform: translateX(24%) !important;
   filter:
     saturate(.93)
     brightness(.94)
@@ -2467,30 +2469,31 @@ body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-batt
 }
 
 body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .turn-button.stage07-end-turn-device:not(:disabled):hover {
-  transform: translateX(15%) translateY(-1px) scale(1.012) !important;
+  transform: translateX(24%) translateY(-1px) scale(1.012) !important;
 }
 
 body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .turn-button.stage07-end-turn-device:not(:disabled):active {
-  transform: translateX(16%) translateY(2px) scale(.968) !important;
+  transform: translateX(25%) translateY(2px) scale(.968) !important;
 }
 
 @media (orientation: landscape) and (max-height: 500px) {
   body.foundation-cd-enabled .battlefield-coordinate-layer .stage072b-end-turn-socket {
-    top: 34.1cqh !important;
-    width: 12.6cqw !important;
-    height: 10.9cqh !important;
+    top: 34.65cqh !important;
+    right: -1.15cqw !important;
+    width: 11.8cqw !important;
+    height: 9.1cqh !important;
   }
 
   body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .turn-button.stage07-end-turn-device {
-    width: 8.35cqw !important;
-    transform: translateX(14%) !important;
+    width: 8.2cqw !important;
+    transform: translateX(23%) !important;
   }
 
   body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .turn-button.stage07-end-turn-device:not(:disabled):hover {
-    transform: translateX(14%) translateY(-1px) scale(1.01) !important;
+    transform: translateX(23%) translateY(-1px) scale(1.01) !important;
   }
 
   body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .turn-button.stage07-end-turn-device:not(:disabled):active {
-    transform: translateX(15%) translateY(1px) scale(.97) !important;
+    transform: translateX(24%) translateY(1px) scale(.97) !important;
   }
 }
