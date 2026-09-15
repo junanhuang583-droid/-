@@ -80,8 +80,11 @@ function render(): void {
       <section class="status-toast ${notice ? "show" : ""}">${escapeHtml(notice)}</section>
 
       <section class="battlefield-viewport" aria-label="战场">
-        <div class="battlefield-coordinate-layer" data-battlefield-design="1152x648">
+        <div class="battlefield-coordinate-layer" data-battlefield-design="1152x648" data-stage07-lock="battlefield-v1">
           <div class="battlefield-future-anchor" data-battlefield-anchor="discard-future" aria-hidden="true"></div>
+          <div class="stage07-utility-actions" data-battlefield-anchor="utility-actions">
+            <button class="secondary-button" data-new-game="confirm" ${interactionLocked ? "disabled" : ""}>新对局</button>
+          </div>
           <section class="battle-shell">
         ${heroPanel(opponent, false)}
         ${boardZone(opponent, false)}
@@ -110,7 +113,6 @@ function render(): void {
           </div>
           <div class="rail-actions" data-battlefield-anchor="turn-actions">
             <button id="end-turn" class="primary-button turn-button" ${state.winner || interactionLocked ? "disabled" : ""}>结束回合</button>
-            <button class="secondary-button" data-new-game="confirm" ${interactionLocked ? "disabled" : ""}>新对局</button>
           </div>
         </aside>
       </section>

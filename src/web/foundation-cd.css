@@ -2239,3 +2239,27 @@ body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-batt
     width: 10.4cqw !important;
   }
 }
+
+
+/* Stage 0-7.0 battlefield baseline freeze.
+   Stage 0 anchors remain locked to the 1152x648 coordinate layer.
+   The New Game control is intentionally kept as the existing secondary control,
+   moved only to the upper-right utility area; it is NOT part of the battlefield-art fusion pass. */
+body.foundation-cd-enabled .battlefield-coordinate-layer .stage07-utility-actions {
+  position: absolute;
+  z-index: 24;
+  top: max(6px, 1cqh);
+  right: max(145px, 11.8cqw);
+  pointer-events: auto;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .stage07-utility-actions .secondary-button {
+  margin: 0;
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  body.foundation-cd-enabled .battlefield-coordinate-layer .stage07-utility-actions {
+    top: max(4px, .8cqh);
+    right: max(132px, 11.2cqw);
+  }
+}
