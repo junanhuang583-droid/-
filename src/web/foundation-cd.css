@@ -2367,3 +2367,130 @@ body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-batt
     transition: none !important;
   }
 }
+
+
+/* Stage 0-7.2B end-turn fusion socket.
+   The approved control remains a real button, but now sits inside a fixed
+   battlefield-native recess so it reads as architecture instead of a sticker.
+   This layer is presentation-only and never intercepts pointer input. */
+body.foundation-cd-enabled .battlefield-coordinate-layer > .battlefield-fusion-layer {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 9 !important;
+  overflow: visible !important;
+  pointer-events: none !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .stage072b-end-turn-socket {
+  position: absolute !important;
+  right: -.35cqw !important;
+  top: 34.75cqh !important;
+  width: 13.1cqw !important;
+  height: 11.4cqh !important;
+  clip-path: polygon(0 18%, 13% 0, 100% 0, 100% 100%, 13% 100%, 0 82%) !important;
+  background:
+    linear-gradient(90deg,
+      rgba(12, 11, 10, .82) 0%,
+      rgba(28, 24, 21, .76) 28%,
+      rgba(45, 35, 27, .42) 62%,
+      rgba(10, 9, 9, .88) 100%) !important;
+  border-left: 1px solid rgba(174, 129, 77, .26) !important;
+  box-shadow:
+    inset .28cqw 0 .42cqw rgba(203, 147, 82, .09),
+    inset 0 .36cqh .56cqh rgba(0, 0, 0, .52),
+    inset 0 -.42cqh .62cqh rgba(0, 0, 0, .68),
+    -.45cqw .28cqh 1.05cqw rgba(0, 0, 0, .36) !important;
+  opacity: .96 !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .stage072b-end-turn-socket::before,
+body.foundation-cd-enabled .battlefield-coordinate-layer .stage072b-end-turn-socket::after {
+  content: "" !important;
+  position: absolute !important;
+  left: 8% !important;
+  right: -2% !important;
+  height: .42cqh !important;
+  background:
+    linear-gradient(180deg,
+      rgba(170, 121, 68, .20),
+      rgba(39, 30, 24, .76) 42%,
+      rgba(6, 6, 6, .88)) !important;
+  box-shadow:
+    0 1px 0 rgba(216, 160, 92, .08),
+    0 .24cqh .34cqh rgba(0, 0, 0, .42) !important;
+  opacity: .88 !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .stage072b-end-turn-socket::before {
+  top: 10% !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .stage072b-end-turn-socket::after {
+  bottom: 10% !important;
+  transform: scaleY(-1) !important;
+}
+
+/* Seat the interactive mechanism deeper into the new recess. */
+body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] {
+  z-index: 10 !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .turn-button.stage07-end-turn-device {
+  width: 8.75cqw !important;
+  transform: translateX(15%) !important;
+  filter:
+    saturate(.93)
+    brightness(.94)
+    drop-shadow(0 .30cqh .36cqh rgba(0,0,0,.46))
+    drop-shadow(0 0 .14cqw rgba(194,127,50,.13)) !important;
+}
+
+/* Repair the missing upper-left corner by reusing the approved upper-right
+   hardware from the same art asset, mirrored into the symmetric position.
+   This avoids inventing a new ornament and keeps all four corner modules
+   visually consistent. */
+body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .turn-button.stage07-end-turn-device::before {
+  content: "" !important;
+  position: absolute !important;
+  z-index: 2 !important;
+  left: 7.8% !important;
+  top: 12.5% !important;
+  width: 14.6% !important;
+  height: 30.6% !important;
+  background-image: url("./assets/ui-stage07/end-turn-device.webp") !important;
+  background-repeat: no-repeat !important;
+  background-size: 686.7% 327.3% !important;
+  background-position: 90.9% 18% !important;
+  transform: scaleX(-1) !important;
+  transform-origin: center !important;
+  pointer-events: none !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .turn-button.stage07-end-turn-device:not(:disabled):hover {
+  transform: translateX(15%) translateY(-1px) scale(1.012) !important;
+}
+
+body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .turn-button.stage07-end-turn-device:not(:disabled):active {
+  transform: translateX(16%) translateY(2px) scale(.968) !important;
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  body.foundation-cd-enabled .battlefield-coordinate-layer .stage072b-end-turn-socket {
+    top: 34.1cqh !important;
+    width: 12.6cqw !important;
+    height: 10.9cqh !important;
+  }
+
+  body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .turn-button.stage07-end-turn-device {
+    width: 8.35cqw !important;
+    transform: translateX(14%) !important;
+  }
+
+  body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .turn-button.stage07-end-turn-device:not(:disabled):hover {
+    transform: translateX(14%) translateY(-1px) scale(1.01) !important;
+  }
+
+  body.foundation-cd-enabled .battlefield-coordinate-layer .battle-rail [data-battlefield-anchor="turn-actions"] .turn-button.stage07-end-turn-device:not(:disabled):active {
+    transform: translateX(15%) translateY(1px) scale(.97) !important;
+  }
+}
