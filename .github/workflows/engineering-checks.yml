@@ -1,0 +1,34 @@
+name: Engineering acceptance
+on:
+  workflow_call:
+  push:
+    branches: [refactor/engineering-baseline-v1]
+    paths: ['src/**', 'tests/**', 'package*.json', 'scripts/**', 'playwright.config.ts', 'vitest.config.ts', 'docs/**']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: 22, cache: npm}
+      - run: npm ci
+      - run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - name: Record tested source
+        if: always()
+        run: |
+          mkdir -p test-results
+          git rev-parse HEAD > test-results/source-commit.txt
+          cp dist/build-info.json test-results/build-info.json || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: engineering-acceptance-${{ github.sha }}
+          path: test-results
+          retention-days: 14
