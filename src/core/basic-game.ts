@@ -1,6 +1,8 @@
 import type { CardId, Keyword, MinionCardDefinition } from "../model/cards.js";
 import type { GameState, MinionInstance, PlayerId, PlayerState, StatusState } from "../model/state.js";
+import { parseUnitDeathrattle, type PendingUnitEffect } from "./deathrattle-effects.js";
 import { RULES_CORE_V1 } from "./rules-core-v1.js";
+import { otherPlayer as opponentOf, scopeAllowsTarget, targetedEffectPassesTaunt } from "./unit-targeting.js";
 
 export interface BasicGameLogEntry {
   at: string;
@@ -32,7 +34,10 @@ export interface BasicGameSession {
   state: GameState;
   log: BasicGameLogEntry[];
   /** v0.3 起加入。保留可选以兼容旧的本地 v1 存档。 */
-  pendingEffects?: PendingMinionTargetEffect[];
+  pendingEffects?: Array<PendingMinionTargetEffect | PendingUnitEffect>;
+  /** Versioned runtime metadata; saved with the game, never in a second storage key. */
+  revision?: number;
+  demoSpecialsAdded?: boolean;
 }
 
 export interface BasicGameCatalog {
@@ -150,12 +155,18 @@ export function revealCurrentTurn(session: BasicGameSession): void {
 
 export function currentPendingEffect(session: BasicGameSession): PendingMinionTargetEffect | null {
   ensureSessionExtensions(session);
-  trimPendingEffects(session);
-  return session.pendingEffects?.[0] ?? null;
+  const effect = session.pendingEffects?.[0];
+  return effect && effect.kind !== "unit" ? effect : null;
 }
 
 export function getSummonRequirement(card: MinionCardDefinition): SummonRequirement {
   const text = card.summonText;
+  const needsSeriesStone = ["史前巨兽", "洪荒异兽"].includes(card.series ?? "")
+    || (card.series === "龙神" && !/无需进化石/.test(text ?? ""));
+  if (needsSeriesStone) return {
+    healthCost: 0, sacrificeCount: 0,
+    unsupportedReason: "该系列需要进化石；进化石结算尚未实现，不能跳过系列条件召唤。"
+  };
   if (!text || /直接召唤/.test(text)) return { healthCost: 0, sacrificeCount: 0, unsupportedReason: null };
 
   const healthMatch = text.match(/扣\s*(\d+)\s*血/);
@@ -194,14 +205,16 @@ export function summonFromHand(
   ensureSessionExtensions(session);
   if (session.state.winner) return "对局已经结束。";
   if (session.handoffRequired) return "请先完成回合交接。";
-  if (currentPendingEffect(session)) return "请先结算当前待处理的亡语效果。";
+  if (hasPendingEffects(session)) return "请先结算当前待处理的亡语效果。";
 
   const player = session.state.players[session.state.activePlayer];
   if (player.normalSummonsUsedThisTurn >= RULES_CORE_V1.normalSummonsPerTurn) {
     return "本回合已经进行过普通召唤。";
   }
-  if (slotIndex < 0 || slotIndex >= RULES_CORE_V1.normalBoardSlots) return "随从位无效。";
-  if (player.board[slotIndex] !== null) return "该随从位已经被占用。";
+  if (!Number.isInteger(handIndex) || handIndex < 0) return "手牌位置无效。";
+  if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= RULES_CORE_V1.normalBoardSlots) return "随从位无效。";
+  const occupant = player.board[slotIndex];
+  if (occupant && !sacrificeInstanceIds.includes(occupant.instanceId)) return "该随从位已经被占用。";
 
   const cardId = player.hand[handIndex];
   if (!cardId) return "手牌不存在。";
@@ -239,9 +252,18 @@ export function summonFromHand(
   }
 
   const instance = createMinionInstance(card, player.id, session.state.turn);
+  // A sacrificed unit may already have spawned a deathrattle token here.
+  // Preserve that unit; never create a temporary sixth logical board slot.
+  const spawned = player.board[slotIndex];
+  if (spawned) {
+    const empty = player.board.findIndex((entry, index) => index !== slotIndex && entry === null);
+    if (empty >= 0) player.board[empty] = spawned;
+    else player.overflowMinions.push(spawned);
+  }
   player.board[slotIndex] = instance;
   player.normalSummonsUsedThisTurn += 1;
   log(session, `${playerName(player.id)}召唤了「${card.name}」到 ${slotIndex + 1} 号位。`);
+  settlePendingEffects(session, catalog);
   resolveWinner(session);
   touch(session);
   return null;
@@ -256,7 +278,7 @@ export function attackMinion(
   ensureSessionExtensions(session);
   if (session.state.winner) return "对局已经结束。";
   if (session.handoffRequired) return "请先完成回合交接。";
-  if (currentPendingEffect(session)) return "请先结算当前待处理的亡语效果。";
+  if (hasPendingEffects(session)) return "请先结算当前待处理的亡语效果。";
 
   const active = session.state.activePlayer;
   const attacker = findBoardMinion(session, active, attackerInstanceId);
@@ -279,6 +301,7 @@ export function attackMinion(
   if (target.minion.currentHealth <= 0) {
     killMinion(session, defenderId, target.slotIndex, "damage", catalog);
   }
+  settlePendingEffects(session, catalog);
   resolveWinner(session);
   touch(session);
   return null;
@@ -292,7 +315,7 @@ export function attackHero(
   ensureSessionExtensions(session);
   if (session.state.winner) return "对局已经结束。";
   if (session.handoffRequired) return "请先完成回合交接。";
-  if (currentPendingEffect(session)) return "请先结算当前待处理的亡语效果。";
+  if (hasPendingEffects(session)) return "请先结算当前待处理的亡语效果。";
 
   const active = session.state.activePlayer;
   const attacker = findBoardMinion(session, active, attackerInstanceId);
@@ -309,6 +332,7 @@ export function attackHero(
   attacker.minion.attacksUsedThisTurn += 1;
   log(session, `${playerName(active)}的「${cardName(attacker.minion.cardId, catalog)}」直接攻击${playerName(targetPlayerId)}，造成 ${damage} 点伤害。`);
   applyLifesteal(session, catalog, attacker.minion, damage);
+  settlePendingEffects(session, catalog);
   resolveWinner(session);
   touch(session);
   return null;
@@ -324,7 +348,7 @@ export function drainMinion(
   sourceLabel = "汲取",
 ): string | null {
   ensureSessionExtensions(session);
-  if (amount <= 0) return "汲取数值必须大于0。";
+  if (!Number.isFinite(amount) || amount <= 0) return "汲取数值必须大于0。";
   const target = findBoardMinion(session, targetPlayerId, targetInstanceId);
   if (!target) return "汲取目标不存在。";
 
@@ -334,6 +358,8 @@ export function drainMinion(
   session.state.players[sourcePlayerId].health += actualLoss;
   log(session, `${sourceLabel}使「${cardName(target.minion.cardId, catalog)}」失去 ${actualLoss} 点生命，并为${playerName(sourcePlayerId)}回复 ${actualLoss} 点生命。`);
   if (target.minion.currentHealth <= 0) killMinion(session, targetPlayerId, target.slotIndex, "other", catalog);
+  settlePendingEffects(session, catalog);
+  resolveWinner(session);
   touch(session);
   return null;
 }
@@ -342,25 +368,30 @@ export function choosePendingEffectTarget(
   session: BasicGameSession,
   catalog: BasicGameCatalog,
   targetInstanceId: string,
+  expectedEffectId?: string,
 ): string | null {
   ensureSessionExtensions(session);
   const effect = currentPendingEffect(session);
   if (!effect) return "当前没有待选择目标的效果。";
+  if (expectedEffectId && effect.id !== expectedEffectId) return "待结算效果已变化，请重新选择。";
   if (effect.selectedTargetIds.includes(targetInstanceId)) return "同一次效果不能重复选择同一只随从。";
 
   const target = findBoardMinion(session, effect.targetPlayer, targetInstanceId);
   if (!target) return "该随从不是当前效果的合法目标。";
 
+  const enemyTaunt = session.state.players[effect.targetPlayer].board.some((minion) => minion && minionHasKeyword(session, catalog, minion, "taunt"));
+  if (!targetedEffectPassesTaunt(effect.sourcePlayer, { playerId: effect.targetPlayer, kind: "minion", isTaunt: minionHasKeyword(session, catalog, target.minion, "taunt") }, enemyTaunt)) return "必须优先选择嘲讽随从。";
   applyControlStatus(session, target.minion, effect.kind, effect.durationOwnTurns, effect.sourceCardId);
   effect.selectedTargetIds.push(targetInstanceId);
   effect.remainingTargets -= 1;
   const label = effect.kind === "freeze" ? "冰冻" : "石化";
   log(session, `「${effect.sourceName}」的亡语使「${cardName(target.minion.cardId, catalog)}」${label} ${effect.durationOwnTurns} 个自己的回合。`);
 
-  if (effect.remainingTargets <= 0 || countRemainingEffectTargets(session, effect) <= 0) {
+  if (effect.remainingTargets <= 0 || controlEffectTargets(session, catalog, effect).length <= 0) {
     session.pendingEffects!.shift();
   }
-  trimPendingEffects(session);
+  settlePendingEffects(session, catalog);
+  resolveWinner(session);
   touch(session);
   return null;
 }
@@ -413,7 +444,7 @@ export function endTurn(
   ensureSessionExtensions(session);
   if (session.state.winner) return "对局已经结束。";
   if (session.handoffRequired) return "请先完成回合交接。";
-  if (currentPendingEffect(session)) return "请先结算当前待处理的亡语效果。";
+  if (hasPendingEffects(session)) return "请先结算当前待处理的亡语效果。";
 
   const previous = session.state.activePlayer;
   const next = otherPlayer(previous);
@@ -490,6 +521,8 @@ function validateAttacker(
   found: { minion: MinionInstance; slotIndex: number },
 ): string | null {
   const minion = found.minion;
+  if (session.state.winner || session.handoffRequired || hasPendingEffects(session)) return "当前不能攻击。";
+  if (minion.currentHealth <= 0) return "该随从已经死亡。";
   if (minion.controller !== session.state.activePlayer) return "只能使用当前回合一方的随从攻击。";
   if (isControlStatusActive(session, minion, "petrify")) return "该随从本回合处于石化状态，不能行动且技能无效。";
   if (isControlStatusActive(session, minion, "freeze")) return "该随从本回合处于冰冻状态，不能行动。";
@@ -616,6 +649,8 @@ function killMinion(
     instanceId: minion.instanceId,
     cause,
     canRevive: cause !== "execution",
+    controllerAtDeath: playerId,
+    deathrattleSuppressed: petrifiedAtDeath,
   });
   log(session, `「${cardName(minion.cardId, catalog)}」因${deathCauseLabel(cause)}死亡并进入${playerName(playerId)}弃牌堆。`);
 
@@ -662,6 +697,21 @@ function resolveDeathrattles(
       continue;
     }
 
+    const targeted = parseUnitDeathrattle(card, controllerAtDeath, text, createId());
+    if (targeted) {
+      if (unitEffectTargets(session, catalog, targeted).length > 0) session.pendingEffects!.push(targeted);
+      else log(session, `「${card.name}」亡语触发，但没有合法目标。`);
+      continue;
+    }
+    const heal = text.replace(/\s+/g, "").match(/^死后给己方所有单位加(\d+)血$/);
+    if (heal) {
+      const amount = Number(heal[1]);
+      const side = session.state.players[controllerAtDeath];
+      side.health += amount;
+      for (const unit of [...side.board, ...side.overflowMinions]) if (unit) unit.currentHealth += amount;
+      log(session, `「${card.name}」亡语使己方所有单位回复 ${amount} 点生命。`);
+      continue;
+    }
     log(session, `「${card.name}」亡语已识别，但“${text}”仍需要目标或范围规则，当前不擅自结算。`);
   }
 }
@@ -732,16 +782,25 @@ function createMinionInstance(card: MinionCardDefinition, owner: PlayerId, turn:
   };
 }
 
-function countRemainingEffectTargets(session: BasicGameSession, effect: PendingMinionTargetEffect): number {
-  return session.state.players[effect.targetPlayer].board.filter((minion) => minion && !effect.selectedTargetIds.includes(minion.instanceId)).length;
+/** Return the same legal list used by the picker and the command handler. */
+export function controlEffectTargets(session: BasicGameSession, catalog: BasicGameCatalog, effect: PendingMinionTargetEffect): MinionInstance[] {
+  const board = session.state.players[effect.targetPlayer].board;
+  const taunt = board.some((m) => m && minionHasKeyword(session, catalog, m, "taunt"));
+  return board.filter((m): m is MinionInstance => m !== null && !effect.selectedTargetIds.includes(m.instanceId)
+    && targetedEffectPassesTaunt(effect.sourcePlayer, { playerId: effect.targetPlayer, kind: "minion", isTaunt: minionHasKeyword(session, catalog, m, "taunt") }, taunt));
 }
 
-function trimPendingEffects(session: BasicGameSession): void {
+/** Consume exhausted choices at the rules boundary, never by scanning UI logs. */
+export function settlePendingEffects(session: BasicGameSession, catalog: BasicGameCatalog): void {
   ensureSessionExtensions(session);
   while (session.pendingEffects!.length > 0) {
     const effect = session.pendingEffects![0]!;
-    if (effect.remainingTargets > 0 && countRemainingEffectTargets(session, effect) > 0) break;
+    const available = effect.kind === "unit"
+      ? unitEffectTargets(session, catalog, effect).length
+      : controlEffectTargets(session, catalog, effect).length;
+    if (effect.remainingTargets > 0 && available > 0) break;
     session.pendingEffects!.shift();
+    if (effect.remainingTargets > 0) log(session, `「${effect.sourceName}」剩余效果没有合法目标，结束本次选择。`);
   }
 }
 
@@ -760,6 +819,7 @@ function pruneExpiredControlStatuses(session: BasicGameSession, playerId: Player
 }
 
 function resolveWinner(session: BasicGameSession): void {
+  if (hasPendingEffects(session)) return;
   const previousWinner = session.state.winner;
   const p1Dead = session.state.players.P1.health <= 0;
   const p2Dead = session.state.players.P2.health <= 0;
@@ -848,4 +908,77 @@ function shuffle<T>(items: T[], random: () => number): void {
 function createId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
   return `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+
+export function hasPendingEffects(session: BasicGameSession): boolean {
+  return (session.pendingEffects?.length ?? 0) > 0;
+}
+
+export function currentPendingUnitEffect(session: BasicGameSession): PendingUnitEffect | null {
+  const effect = session.pendingEffects?.[0];
+  return effect?.kind === "unit" ? effect : null;
+}
+
+export interface UnitEffectTarget {
+  key: string;
+  playerId: PlayerId;
+  kind: "hero" | "minion";
+  instanceId?: string;
+  isTaunt?: boolean;
+  label: string;
+  detail: string;
+}
+
+export function unitEffectTargets(session: BasicGameSession, catalog: BasicGameCatalog, effect: PendingUnitEffect): UnitEffectTarget[] {
+  const result: UnitEffectTarget[] = [];
+  const enemy = opponentOf(effect.sourcePlayer);
+  const enemyTaunt = session.state.players[enemy].board.some((m) => m && minionHasKeyword(session, catalog, m, "taunt"));
+  const accept = (target: UnitEffectTarget): void => {
+    if (!(effect.action === "attack_buff" && target.kind === "hero") && !effect.selectedKeys.includes(target.key) && scopeAllowsTarget(effect.sourcePlayer, effect.scope, target)
+      && targetedEffectPassesTaunt(effect.sourcePlayer, target, enemyTaunt)) result.push(target);
+  };
+  for (const playerId of ["P1", "P2"] as const) {
+    const side = session.state.players[playerId];
+    accept({ key: `hero:${playerId}`, playerId, kind: "hero", label: playerName(playerId), detail: `♥ ${side.health}` });
+    side.board.forEach((m, index) => {
+      if (!m) return;
+      accept({
+        key: `minion:${m.instanceId}`, playerId, kind: "minion", instanceId: m.instanceId,
+        isTaunt: minionHasKeyword(session, catalog, m, "taunt"), label: cardName(m.cardId, catalog),
+        detail: `${index + 1}号位 · ⚔ ${getAttack(m, catalog)} · ♥ ${m.currentHealth}`
+      });
+    });
+  }
+  return result;
+}
+
+/** The same damage, death and deathrattle pipeline serves all target choices. */
+export function chooseUnitEffectTarget(session: BasicGameSession, catalog: BasicGameCatalog, effectId: string, key: string): string | null {
+  const effect = currentPendingUnitEffect(session);
+  if (!effect || effect.id !== effectId) return "待结算效果已变化，请重新选择。";
+  const target = unitEffectTargets(session, catalog, effect).find((entry) => entry.key === key);
+  if (!target) return "这个目标当前不合法。";
+  if (target.kind === "hero") {
+    const hero = session.state.players[target.playerId];
+    hero.health += effect.action === "heal" ? effect.amount : -effect.amount;
+  } else {
+    const found = findBoardMinion(session, target.playerId, target.instanceId!);
+    if (!found) return "目标已经离场。";
+    if (effect.action === "heal") found.minion.currentHealth += effect.amount;
+    else if (effect.action === "attack_buff") found.minion.attackModifier += effect.amount;
+    else {
+      if (effect.action === "damage") applyDamageToMinion(session, found.minion, effect.amount, catalog);
+      else found.minion.currentHealth -= effect.amount;
+      if (found.minion.currentHealth <= 0) killMinion(session, target.playerId, found.slotIndex, effect.action === "damage" ? "damage" : "other", catalog);
+    }
+  }
+  log(session, `「${effect.sourceName}」亡语对「${target.label}」完成结算。`);
+  effect.selectedKeys.push(key);
+  effect.remainingTargets -= 1;
+  if (effect.remainingTargets <= 0 || unitEffectTargets(session, catalog, effect).length === 0) session.pendingEffects!.shift();
+  settlePendingEffects(session, catalog);
+  resolveWinner(session);
+  touch(session);
+  return null;
 }

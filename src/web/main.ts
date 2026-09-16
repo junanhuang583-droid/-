@@ -1,30 +1,21 @@
-import cardRecord from "../../docs/卡牌游戏记录_v0.5.md?raw";
 import {
-  attackHero,
-  attackMinion,
   canMinionAttack,
-  createBasicGame,
-  createCatalog,
-  endTurn,
-  revealCurrentTurn,
-  summonFromHand,
-  type BasicGameSession,
+  hasPendingEffects,
+  type BasicGameSession
 } from "../core/basic-game.js";
-import { parseMinionCardsFromRecord } from "../data/parse-card-record.js";
-import type { CardId, MinionCardDefinition } from "../model/cards.js";
+import type { CardId } from "../model/cards.js";
 import type { MinionInstance, PlayerId } from "../model/state.js";
-import { installPersistenceGuards, loadSavedSession, saveSession } from "./persistence.js";
+import { catalog } from "./game-catalog.js";
+import { dispatchGame, finishOpeningDeal, persistenceWarning, readSession, resetGame, subscribeSession, wasSessionRestored } from "./session-runtime.js";
 import "./styles.css";
+import { publishViewRendered } from "./view-events.js";
 
-const parsedCards = parseMinionCardsFromRecord(cardRecord);
-const cards: MinionCardDefinition[] = parsedCards.map((card) => card);
-const catalog = createCatalog(cards);
 const appRoot = document.querySelector<HTMLDivElement>("#app");
 if (!appRoot) throw new Error("缺少 #app 根节点");
 const root: HTMLDivElement = appRoot;
 
-const restoredSession = loadSavedSession();
-let session: BasicGameSession = restoredSession ?? createBasicGame(cards);
+const restoredSession = wasSessionRestored ? readSession() : null;
+let session: BasicGameSession = readSession();
 let selectedHandIndex: number | null = null;
 let selectedAttackerId: string | null = null;
 let pendingTurnDrawCount = 0;
@@ -35,28 +26,30 @@ let notice = restoredSession
   ? "已恢复上次对局。新对局将启用扩展演示牌池。"
   : "新对局准备中：洗牌并发初始手牌。";
 
-saveSession(session);
-installPersistenceGuards(() => session);
-
-window.addEventListener("storage", (event) => {
-  if (!event.key?.startsWith("lushizhizao.basic-game.v1")) return;
-  const latest = loadSavedSession();
-  if (!latest || latest.updatedAt <= session.updatedAt) return;
-  session = latest;
-  selectedHandIndex = null;
+let sessionRenderQueued = false;
+subscribeSession((reason) => {
+  session = readSession();
   selectedAttackerId = null;
-  pendingTurnDrawCount = 0;
-  hiddenDrawCount = 0;
-  openingDealActive = false;
-  animationRunning = false;
-  notice = "另一个标签页有更新，已同步。";
-  render();
+  selectedHandIndex = null;
+  if (reason === "external") {
+    animationEpoch += 1;
+    pendingTurnDrawCount = 0;
+    hiddenDrawCount = 0;
+    openingDealActive = false;
+    animationRunning = false;
+    notice = "已同步另一窗口中的对局。";
+  }
+  if (sessionRenderQueued) return;
+  sessionRenderQueued = true;
+  queueMicrotask(() => { sessionRenderQueued = false; render(); });
 });
+let animationEpoch = 0;
 
 render();
 if (openingDealActive) void playOpeningDeal();
 
 function render(): void {
+  session = readSession();
   const state = session.state;
   const active = state.activePlayer;
   const opponent = otherPlayer(active);
@@ -64,7 +57,7 @@ function render(): void {
   const interactionLocked = openingDealActive || animationRunning;
 
   root.innerHTML = `
-    <main class="game-shell ${openingDealActive ? "opening-deal" : ""} ${hiddenDrawCount > 0 ? "draw-animating" : ""}">
+    <main class="game-shell ${session.handoffRequired ? "session-private" : ""} ${openingDealActive ? "opening-deal" : ""} ${hiddenDrawCount > 0 ? "draw-animating" : ""}">
       <header class="game-topbar">
         <div class="brand-block">
           <strong>Card Game</strong>
@@ -77,17 +70,16 @@ function render(): void {
         </div>
       </header>
 
-      <section class="status-toast ${notice ? "show" : ""}">${escapeHtml(notice)}</section>
+      <section class="status-toast ${notice ? "show" : ""}">${escapeHtml(persistenceWarning() || notice)}</section>
 
-      <section class="battlefield-viewport" aria-label="战场">
-        <div class="battlefield-coordinate-layer" data-battlefield-design="1152x648" data-stage07-lock="battlefield-v1">
-          <div class="battlefield-future-anchor" data-battlefield-anchor="discard-future" aria-hidden="true"></div>
           <div class="stage07-utility-actions" data-battlefield-anchor="utility-actions">
             <button class="secondary-button" data-new-game="confirm" ${interactionLocked ? "disabled" : ""}>新对局</button>
           </div>
-          <div class="battlefield-fusion-layer" aria-hidden="true">
-            <div class="stage072b-end-turn-socket" data-battlefield-anchor="end-turn-socket"></div>
-          </div>
+
+      <section class="battlefield-viewport" aria-label="战场">
+        <div class="battlefield-coordinate-layer" data-battlefield-design="1152x648" data-stage07-lock="battlefield-v1">
+          <div id="battlefield-background" aria-hidden="true"><img src="./assets/battlefield/gothic-abyss.webp" alt="" draggable="false" fetchpriority="high" /></div>
+          <div class="battlefield-future-anchor" data-battlefield-anchor="discard-future" aria-hidden="true"></div>
           <section class="battle-shell">
         ${heroPanel(opponent, false)}
         ${boardZone(opponent, false)}
@@ -115,7 +107,7 @@ function render(): void {
             <small>P1 弃牌 ${state.players.P1.discardPile.length} · P2 弃牌 ${state.players.P2.discardPile.length}</small>
           </div>
           <div class="rail-actions" data-battlefield-anchor="turn-actions">
-            <button id="end-turn" class="primary-button turn-button stage07-end-turn-device" data-stage07-control="end-turn" aria-label="结束回合" ${state.winner || interactionLocked ? "disabled" : ""}>结束回合</button>
+            <button id="end-turn" class="primary-button turn-button stage07-end-turn-device" data-stage07-control="end-turn" aria-label="结束回合" ${state.winner || session.handoffRequired || hasPendingEffects(session) || interactionLocked ? "disabled" : ""}><span class="end-turn-label">结束回合</span></button>
           </div>
         </aside>
       </section>
@@ -139,7 +131,7 @@ function render(): void {
       <details class="debug-drawer">
         <summary>测试信息</summary>
         <div class="debug-content">
-          <div class="mode-note">当前仅执行基础规则。特殊效果、关键词、召唤条件、进化、装备和场景暂不结算。演示牌池会让所有“生命与攻击已明确”的正式随从至少出现1张；数量未确认的卡只在本演示牌池临时按1张使用，不写回正式记录。</div>
+          <div class="mode-note">当前支持基础战斗、献祭、部分关键词与明确亡语。进化、装备、场景与AI尚未实现；并非全部卡牌技能都可执行。演示牌池会让所有“生命与攻击已明确”的正式随从至少出现1张；数量未确认的卡只在本演示牌池临时按1张使用，不写回正式记录。</div>
           <div class="debug-stats">
             <span>演示牌池 ${catalog.playableUniqueCards} 种 / ${catalog.playableDeckSize} 张</span>
             <span>死亡记录 ${state.deathLog.length}</span>
@@ -159,6 +151,7 @@ function render(): void {
   `;
 
   bindEvents();
+  publishViewRendered();
 }
 
 function heroPanel(playerId: PlayerId, isActive: boolean): string {
@@ -204,12 +197,12 @@ function boardSlot(
   visualOrder: number | null,
   occupiedCount: number,
 ): string {
-  const logicalOffset = (slotIndex - 2) * 9.2;
+  const logicalOffset = slotIndex - 2;
   if (!minion) {
     const summonReady = isActivePanel && selectedHandIndex !== null && !session.handoffRequired && !animationRunning;
-    return `<button class="board-slot empty-slot ${summonReady ? "summon-ready" : ""}" style="--battle-slot-x:${logicalOffset.toFixed(2)}cqw" data-empty-slot="${slotIndex}" data-battlefield-slot="${playerId}-${slotIndex + 1}" ${isActivePanel && !animationRunning ? "" : "disabled"}><span>${slotIndex + 1}</span><small>${summonReady ? "召唤" : "空位"}</small></button>`;
+    return `<button class="board-slot empty-slot ${summonReady ? "summon-ready" : ""}" style="--battle-slot-index:${logicalOffset}" data-empty-slot="${slotIndex}" data-battlefield-slot="${playerId}-${slotIndex + 1}" ${isActivePanel && !animationRunning ? "" : "disabled"}><span>${slotIndex + 1}</span><small>${summonReady ? "召唤" : "空位"}</small></button>`;
   }
-  const compactOffset = ((visualOrder ?? 0) - (occupiedCount - 1) / 2) * 9.2;
+  const compactOffset = (visualOrder ?? 0) - (occupiedCount - 1) / 2;
   const card = catalog.cards.get(minion.cardId);
   const attack = Math.max(0, (card?.attack ?? 0) + minion.attackModifier);
   const ready = playerId === session.state.activePlayer && canMinionAttack(session, minion) && !session.handoffRequired && !animationRunning;
@@ -217,8 +210,8 @@ function boardSlot(
   const enemyTarget = playerId !== session.state.activePlayer && selectedAttackerId !== null && !session.handoffRequired && !animationRunning;
   return `
     <button class="board-slot minion ${ready ? "attack-ready" : ""} ${selected ? "selected" : ""} ${enemyTarget ? "enemy-target" : ""}"
-      style="--battle-unit-x:${compactOffset.toFixed(2)}cqw;--battle-slot-x:${logicalOffset.toFixed(2)}cqw"
-      data-minion-id="${escapeHtml(minion.instanceId)}" data-owner="${playerId}" data-battlefield-slot="${playerId}-${slotIndex + 1}" ${animationRunning ? "disabled" : ""}>
+      style="--battle-unit-index:${compactOffset};--battle-slot-index:${logicalOffset}"
+      data-minion-id="${escapeHtml(minion.instanceId)}" data-card-id="${escapeHtml(minion.cardId)}" data-owner="${playerId}" data-battlefield-slot="${playerId}-${slotIndex + 1}" ${animationRunning ? "disabled" : ""}>
       <span class="slot-number">${slotIndex + 1}</span>
       <div class="minion-art"><span>${escapeHtml((card?.name ?? minion.cardId).slice(0, 1))}</span></div>
       <strong>${escapeHtml(card?.name ?? minion.cardId)}</strong>
@@ -235,7 +228,7 @@ function handCard(cardId: CardId, index: number, handSize: number): string {
   const unusable = card.health === null || card.attack === null;
   const newlyDrawnHidden = hiddenDrawCount > 0 && index >= handSize - hiddenDrawCount;
   return `
-    <button class="hand-card ${selected ? "selected" : ""} ${newlyDrawnHidden ? "newly-drawn-hidden" : ""}" data-hand-index="${index}" ${unusable || animationRunning ? "disabled" : ""}>
+    <button class="hand-card ${selected ? "selected" : ""} ${newlyDrawnHidden ? "newly-drawn-hidden" : ""}" data-hand-index="${index}" data-card-id="${escapeHtml(cardId)}" ${unusable || animationRunning ? "disabled" : ""}>
       <span class="card-id">${escapeHtml(card.id)}</span>
       <div class="hand-card-art"><span>${escapeHtml(card.name.slice(0, 1))}</span></div>
       <strong>${escapeHtml(card.name)}</strong>
@@ -260,7 +253,7 @@ function bindEvents(): void {
   document.querySelectorAll<HTMLElement>("[data-empty-slot]").forEach((element) => {
     element.addEventListener("click", () => {
       if (selectedHandIndex === null || animationRunning) return;
-      const error = summonFromHand(session, catalog, selectedHandIndex, Number(element.dataset.emptySlot));
+      const error = dispatchGame({ type: "summon", handIndex: selectedHandIndex, slotIndex: Number(element.dataset.emptySlot), cardId: session.state.players[session.state.activePlayer].hand[selectedHandIndex]! });
       if (!error) selectedHandIndex = null;
       selectedAttackerId = null;
       commit(error ?? "召唤完成。", Boolean(error));
@@ -276,7 +269,7 @@ function bindEvents(): void {
       if (owner === session.state.activePlayer) {
         const minion = findMinion(owner, instanceId);
         if (!minion || !canMinionAttack(session, minion)) {
-          commit("这个随从当前不能攻击。", true, false);
+          commit("这个随从当前不能攻击。", true);
           return;
         }
         selectedAttackerId = selectedAttackerId === instanceId ? null : instanceId;
@@ -286,7 +279,7 @@ function bindEvents(): void {
         return;
       }
       if (!selectedAttackerId) return;
-      const error = attackMinion(session, catalog, selectedAttackerId, instanceId);
+      const error = dispatchGame({ type: "attack-minion", attackerId: selectedAttackerId, targetId: instanceId });
       selectedAttackerId = null;
       selectedHandIndex = null;
       commit(error ?? "攻击结算完成。", Boolean(error));
@@ -295,7 +288,7 @@ function bindEvents(): void {
 
   document.querySelector<HTMLElement>("[data-hero-target]")?.addEventListener("click", () => {
     if (!selectedAttackerId || animationRunning) return;
-    const error = attackHero(session, catalog, selectedAttackerId);
+    const error = dispatchGame({ type: "attack-hero", attackerId: selectedAttackerId });
     selectedAttackerId = null;
     selectedHandIndex = null;
     commit(error ?? "英雄受到攻击。", Boolean(error));
@@ -305,7 +298,8 @@ function bindEvents(): void {
     if (animationRunning) return;
     const next = otherPlayer(session.state.activePlayer);
     const handBefore = session.state.players[next].hand.length;
-    const error = endTurn(session);
+    const error = dispatchGame({ type: "end-turn" });
+    session = readSession();
     if (!error) {
       pendingTurnDrawCount = Math.max(0, session.state.players[next].hand.length - handBefore);
     }
@@ -316,12 +310,13 @@ function bindEvents(): void {
 
   document.querySelector<HTMLButtonElement>("#reveal-turn")?.addEventListener("click", () => {
     if (animationRunning) return;
-    revealCurrentTurn(session);
+    dispatchGame({ type: "reveal-turn" });
+    session = readSession();
     const drawCount = pendingTurnDrawCount;
     pendingTurnDrawCount = 0;
     hiddenDrawCount = drawCount;
     notice = `${playerLabel(session.state.activePlayer)}已接手。`;
-    saveSession(session);
+
     render();
     if (drawCount > 0) void playTurnDraw(drawCount);
   });
@@ -337,7 +332,9 @@ function bindEvents(): void {
 }
 
 function startNewGame(): void {
-  session = createBasicGame(cards);
+  animationEpoch += 1;
+  resetGame();
+  session = readSession();
   selectedAttackerId = null;
   selectedHandIndex = null;
   pendingTurnDrawCount = 0;
@@ -345,14 +342,14 @@ function startNewGame(): void {
   openingDealActive = true;
   animationRunning = false;
   notice = "新对局准备中：洗牌并发初始手牌。";
-  saveSession(session);
+
   render();
   void playOpeningDeal();
 }
 
-function commit(message: string, isError = false, persist = true): void {
+function commit(message: string, isError = false): void {
   notice = isError ? `无法执行：${message}` : message;
-  if (persist) saveSession(session);
+
   render();
 }
 
@@ -371,6 +368,7 @@ function openingDealOverlay(): string {
 async function playOpeningDeal(): Promise<void> {
   if (!openingDealActive || animationRunning) return;
   animationRunning = true;
+  const epoch = animationEpoch;
   await wait(reducedMotion() ? 40 : 180);
 
   const progress = () => document.querySelector<HTMLElement>("#deal-progress");
@@ -387,6 +385,7 @@ async function playOpeningDeal(): Promise<void> {
   for (let i = 0; i < openingCount; i += 1) {
     const label = progress();
     if (label) label.textContent = `初始手牌 ${i + 1} / ${openingCount}`;
+    if (epoch !== animationEpoch) return;
     await Promise.all([
       flyCardTo(opponentTarget, i, openingCount, "opponent"),
       flyCardTo(activeTarget, i, openingCount, "active"),
@@ -398,10 +397,13 @@ async function playOpeningDeal(): Promise<void> {
     const label = progress();
     if (label) label.textContent = `先手摸牌 ${firstTurnDraw} 张`;
     for (let i = 0; i < firstTurnDraw; i += 1) {
+      if (epoch !== animationEpoch) return;
       await flyCardTo(activeTarget, i, firstTurnDraw, "draw");
     }
   }
 
+  if (epoch !== animationEpoch) return;
+  finishOpeningDeal();
   openingDealActive = false;
   animationRunning = false;
   notice = `发牌完成。演示牌池共 ${catalog.playableUniqueCards} 种随从。`;
@@ -415,14 +417,17 @@ async function playTurnDraw(count: number): Promise<void> {
     return;
   }
   animationRunning = true;
+  const epoch = animationEpoch;
   render();
   await wait(reducedMotion() ? 30 : 80);
   const target = document.querySelector<HTMLElement>("#active-hand-target");
   if (target) {
     for (let i = 0; i < count; i += 1) {
+      if (epoch !== animationEpoch) return;
       await flyCardTo(target, i, count, "draw");
     }
   }
+  if (epoch !== animationEpoch) return;
   hiddenDrawCount = 0;
   animationRunning = false;
   notice = `${playerLabel(session.state.activePlayer)}摸了 ${count} 张牌。`;
@@ -467,22 +472,22 @@ async function flyCardTo(
     return;
   }
 
-  const animation = card.animate([
-    { transform: "translate3d(0, 0, 0) rotate(5deg) scale(.72)", opacity: 0 },
-    { transform: `translate3d(${dx * 0.42}px, ${dy * 0.28 - 22}px, 0) rotate(-8deg) scale(1.05)`, opacity: 1, offset: 0.45 },
-    { transform: `translate3d(${dx}px, ${dy}px, 0) rotate(${kind === "opponent" ? -4 : 3}deg) scale(.86)`, opacity: 0.94 },
-  ], {
-    duration: kind === "draw" ? 250 : 210,
-    easing: "cubic-bezier(.2,.76,.24,1)",
-    fill: "forwards",
-  });
-
   try {
+    const animation = card.animate([
+      { transform: "translate3d(0, 0, 0) rotate(5deg) scale(.72)", opacity: 0 },
+      { transform: `translate3d(${dx * 0.42}px, ${dy * 0.28 - 22}px, 0) rotate(-8deg) scale(1.05)`, opacity: 1, offset: 0.45 },
+      { transform: `translate3d(${dx}px, ${dy}px, 0) rotate(${kind === "opponent" ? -4 : 3}deg) scale(.86)`, opacity: 0.94 },
+    ], {
+      duration: kind === "draw" ? 250 : 210,
+      easing: "cubic-bezier(.2,.76,.24,1)",
+      fill: "forwards",
+    });
+
     await animation.finished;
   } catch {
     // A render/navigation can cancel a cosmetic animation. Game state is already saved.
   }
-  card.remove();
+  finally { card.remove(); }
   await wait(kind === "draw" ? 35 : 18);
 }
 

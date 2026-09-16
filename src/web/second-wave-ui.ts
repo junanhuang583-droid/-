@@ -1,146 +1,19 @@
-import cardRecord from "../../docs/卡牌游戏记录_v0.5.md?raw";
 import {
-  choosePendingEffectTarget,
-  createCatalog,
+  controlEffectTargets,
   currentPendingEffect,
-  getSummonRequirement,
-  summonFromHand,
-  type BasicGameSession,
+  type BasicGameSession
 } from "../core/basic-game.js";
-import { parseMinionCardsFromRecord } from "../data/parse-card-record.js";
-import type { CardId, MinionCardDefinition } from "../model/cards.js";
 import type { MinionInstance, PlayerId } from "../model/state.js";
-import { loadSavedSession, saveSession } from "./persistence.js";
+import { catalog } from "./game-catalog.js";
+import { dispatchGame, readSession, subscribeSession } from "./session-runtime.js";
+import { onViewRendered } from "./view-events.js";
 
-const SAVE_KEY = "lushizhizao.basic-game.v1";
-const cards: MinionCardDefinition[] = parseMinionCardsFromRecord(cardRecord);
-const catalog = createCatalog(cards);
-const selectedSacrifices = new Set<string>();
-let pendingSummonUi: { handIndex: number; slotIndex: number; sacrificeCount: number; cardId: CardId } | null = null;
 let scheduled = false;
 
 installStyles();
-document.addEventListener("click", interceptAdvancedClicks, true);
-new MutationObserver(scheduleSync).observe(document.querySelector("#app") ?? document.body, { childList: true, subtree: true });
+subscribeSession(scheduleSync);
+onViewRendered(scheduleSync, 60);
 scheduleSync();
-
-function interceptAdvancedClicks(event: MouseEvent): void {
-  const target = event.target;
-  if (!(target instanceof Element)) return;
-
-  const emptySlot = target.closest<HTMLElement>("[data-empty-slot]");
-  if (!emptySlot) return;
-  const selectedCard = document.querySelector<HTMLElement>(".hand-card.selected[data-hand-index]");
-  if (!selectedCard) return;
-
-  const handIndex = Number(selectedCard.dataset.handIndex);
-  const slotIndex = Number(emptySlot.dataset.emptySlot);
-  if (!Number.isInteger(handIndex) || !Number.isInteger(slotIndex)) return;
-
-  const session = loadSavedSession();
-  if (!session) return;
-  const cardId = session.state.players[session.state.activePlayer].hand[handIndex];
-  if (!cardId) return;
-  const card = catalog.cards.get(cardId);
-  if (!card) return;
-  const requirement = getSummonRequirement(card);
-  if (requirement.unsupportedReason || requirement.sacrificeCount <= 0) return;
-
-  event.preventDefault();
-  event.stopPropagation();
-  event.stopImmediatePropagation();
-
-  const available = session.state.players[session.state.activePlayer].board.filter(Boolean).length;
-  if (available < requirement.sacrificeCount) {
-    showTransientMessage(`「${card.name}」需要献祭 ${requirement.sacrificeCount} 只己方随从，但场上数量不足。`);
-    return;
-  }
-
-  pendingSummonUi = { handIndex, slotIndex, sacrificeCount: requirement.sacrificeCount, cardId };
-  selectedSacrifices.clear();
-  renderSacrificePicker(session, card);
-}
-
-function renderSacrificePicker(session: BasicGameSession, card: MinionCardDefinition): void {
-  removeChoiceOverlay();
-  const pending = pendingSummonUi;
-  if (!pending) return;
-  const player = session.state.players[session.state.activePlayer];
-  const overlay = document.createElement("div");
-  overlay.id = "rule-choice-overlay";
-  overlay.className = "rule-choice-overlay";
-  overlay.innerHTML = `
-    <section class="rule-choice-card">
-      <div class="choice-eyebrow">召唤条件 · 献祭</div>
-      <h2>召唤「${escapeHtml(card.name)}」</h2>
-      <p>选择 ${pending.sacrificeCount} 只己方随从作为献祭。献祭算死亡，会进入弃牌堆并正常触发亡语。</p>
-      <div class="sacrifice-grid">
-        ${player.board.map((minion, index) => minion ? sacrificeOption(minion, index) : "").join("")}
-      </div>
-      <div class="choice-footer">
-        <span id="sacrifice-count">已选 0 / ${pending.sacrificeCount}</span>
-        <button id="cancel-sacrifice" class="choice-button secondary" type="button">取消</button>
-        <button id="confirm-sacrifice" class="choice-button primary" type="button" disabled>确认献祭并召唤</button>
-      </div>
-    </section>
-  `;
-  document.body.append(overlay);
-
-  overlay.querySelectorAll<HTMLButtonElement>("[data-sacrifice-id]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const id = button.dataset.sacrificeId;
-      if (!id) return;
-      if (selectedSacrifices.has(id)) selectedSacrifices.delete(id);
-      else if (selectedSacrifices.size < pending.sacrificeCount) selectedSacrifices.add(id);
-      button.classList.toggle("selected", selectedSacrifices.has(id));
-      const count = overlay.querySelector<HTMLElement>("#sacrifice-count");
-      if (count) count.textContent = `已选 ${selectedSacrifices.size} / ${pending.sacrificeCount}`;
-      const confirm = overlay.querySelector<HTMLButtonElement>("#confirm-sacrifice");
-      if (confirm) confirm.disabled = selectedSacrifices.size !== pending.sacrificeCount;
-    });
-  });
-
-  overlay.querySelector<HTMLButtonElement>("#cancel-sacrifice")?.addEventListener("click", () => {
-    pendingSummonUi = null;
-    selectedSacrifices.clear();
-    removeChoiceOverlay();
-  });
-
-  overlay.querySelector<HTMLButtonElement>("#confirm-sacrifice")?.addEventListener("click", () => {
-    const fresh = loadSavedSession();
-    if (!fresh || !pendingSummonUi) return;
-    const summonedCard = catalog.cards.get(pendingSummonUi.cardId);
-    const error = summonFromHand(
-      fresh,
-      catalog,
-      pendingSummonUi.handIndex,
-      pendingSummonUi.slotIndex,
-      [...selectedSacrifices],
-    );
-    if (error) {
-      showChoiceError(overlay, error);
-      return;
-    }
-    pendingSummonUi = null;
-    selectedSacrifices.clear();
-    removeChoiceOverlay();
-    saveAndSync(fresh);
-    showTransientMessage(summonedCard ? `已献祭并召唤「${summonedCard.name}」。` : "献祭召唤完成。");
-  });
-}
-
-function sacrificeOption(minion: MinionInstance, slotIndex: number): string {
-  const card = catalog.cards.get(minion.cardId);
-  const name = card?.name ?? minion.cardId;
-  const attack = Math.max(0, (card?.attack ?? 0) + minion.attackModifier);
-  return `
-    <button class="sacrifice-option" data-sacrifice-id="${escapeHtml(minion.instanceId)}" type="button">
-      <small>${slotIndex + 1}号位</small>
-      <strong>${escapeHtml(name)}</strong>
-      <span>⚔ ${attack}　♥ ${minion.currentHealth}</span>
-    </button>
-  `;
-}
 
 function scheduleSync(): void {
   if (scheduled) return;
@@ -152,11 +25,12 @@ function scheduleSync(): void {
 }
 
 function syncSecondWaveUi(): void {
-  const session = loadSavedSession();
+  const session = readSession();
   if (!session) return;
-  updateModeNote();
+
   applyControlBadges(session);
-  if (!pendingSummonUi) renderPendingEffectPicker(session);
+  if (!session.handoffRequired && !session.state.winner) renderPendingEffectPicker(session);
+  else removeChoiceOverlay();
 }
 
 function renderPendingEffectPicker(session: BasicGameSession): void {
@@ -166,15 +40,16 @@ function renderPendingEffectPicker(session: BasicGameSession): void {
     if (existing?.dataset.effectPicker === "true") existing.remove();
     return;
   }
-  if (existing && existing.dataset.effectId === effect.id) return;
+  if (existing && existing.dataset.effectId === `${effect.id}:${effect.remainingTargets}:${session.revision ?? 0}`) return;
   removeChoiceOverlay();
 
   const label = effect.kind === "freeze" ? "冰冻" : "石化";
   const targetPlayer = session.state.players[effect.targetPlayer];
+  const allowed = new Set(controlEffectTargets(session, catalog, effect).map((m) => m.instanceId));
   const overlay = document.createElement("div");
   overlay.id = "rule-choice-overlay";
   overlay.dataset.effectPicker = "true";
-  overlay.dataset.effectId = effect.id;
+  overlay.dataset.effectId = `${effect.id}:${effect.remainingTargets}:${session.revision ?? 0}`;
   overlay.className = "rule-choice-overlay";
   overlay.innerHTML = `
     <section class="rule-choice-card">
@@ -182,7 +57,7 @@ function renderPendingEffectPicker(session: BasicGameSession): void {
       <h2>「${escapeHtml(effect.sourceName)}」等待选择目标</h2>
       <p>还需选择 ${effect.remainingTargets} 只${playerLabel(effect.targetPlayer)}随从。该状态从目标的下一个自己的回合开始，持续 ${effect.durationOwnTurns} 个自己的回合。</p>
       <div class="sacrifice-grid control-target-grid">
-        ${targetPlayer.board.map((minion, index) => minion && !effect.selectedTargetIds.includes(minion.instanceId) ? controlTargetOption(minion, index) : "").join("")}
+        ${targetPlayer.board.map((minion, index) => minion && allowed.has(minion.instanceId) ? controlTargetOption(minion, index) : "").join("")}
       </div>
       <div class="choice-footer"><span>必须先结算该亡语，才能继续行动。</span></div>
     </section>
@@ -193,35 +68,18 @@ function renderPendingEffectPicker(session: BasicGameSession): void {
     button.addEventListener("click", () => {
       const id = button.dataset.effectTarget;
       if (!id) return;
-      const fresh = loadSavedSession();
+      const fresh = readSession();
       if (!fresh) return;
-      const error = choosePendingEffectTarget(fresh, catalog, id);
+      const error = dispatchGame({ type: "choose-control", effectId: effect.id, targetId: id });
       if (error) {
         showChoiceError(overlay, error);
         return;
       }
       removeChoiceOverlay();
-      saveAndSync(fresh);
+
       showTransientMessage(`${label}亡语已结算。`);
     });
   });
-}
-
-function saveAndSync(session: BasicGameSession): void {
-  saveSession(session);
-  const value = localStorage.getItem(SAVE_KEY);
-  try {
-    window.dispatchEvent(new StorageEvent("storage", {
-      key: SAVE_KEY,
-      newValue: value,
-      storageArea: localStorage,
-      url: window.location.href,
-    }));
-  } catch {
-    // Older engines may not construct StorageEvent. Mutation observers still
-    // resync the auxiliary UI, while the persisted state remains correct.
-  }
-  scheduleSync();
 }
 
 function controlTargetOption(minion: MinionInstance, slotIndex: number): string {
@@ -267,13 +125,6 @@ function controlLabels(session: BasicGameSession, minion: MinionInstance): strin
     labels.push(label);
   }
   return [...new Set(labels)];
-}
-
-function updateModeNote(): void {
-  const note = document.querySelector<HTMLElement>(".mode-note");
-  if (!note || note.dataset.secondWave === "true") return;
-  note.dataset.secondWave = "true";
-  note.textContent = "已启用：扣血召唤、迅疾、快攻、嘲讽、狂妄、守护、甲一/甲二、吸血、献祭、死亡/亡语框架、汲取底层、沉睡/冰冻/石化状态。当前可自动结算潮汐鱼人→鱼仔，以及冰晶/眼墙的控制亡语；需要未确认目标范围的亡语仍不会擅自执行。进化、装备和场景暂未启用。";
 }
 
 function showChoiceError(overlay: HTMLElement, message: string): void {

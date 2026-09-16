@@ -4,3 +4,10 @@ coverage/
 *.log
 .DS_Store
 Thumbs.db
+
+# Deterministic build outputs, never hand-edited binary payloads
+src/web/assets/ui-stage07/end-turn-device.webp
+public/icon-192.png
+public/icon-512.png
+playwright-report/
+test-results/

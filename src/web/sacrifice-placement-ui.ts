@@ -1,25 +1,25 @@
-import cardRecord from "../../docs/卡牌游戏记录_v0.5.md?raw";
-import { createCatalog, getSummonRequirement, type BasicGameSession } from "../core/basic-game.js";
-import { summonIntoSacrificedSlot } from "../core/sacrifice-placement.js";
-import { parseMinionCardsFromRecord } from "../data/parse-card-record.js";
-import type { CardId, MinionCardDefinition } from "../model/cards.js";
+import { getSummonRequirement } from "../core/basic-game.js";
+import type { CardId } from "../model/cards.js";
 import type { MinionInstance } from "../model/state.js";
-import { loadSavedSession, saveSession } from "./persistence.js";
+import { catalog } from "./game-catalog.js";
+import { dispatchGame, readSession, subscribeSession } from "./session-runtime.js";
 
-const SAVE_KEY = "lushizhizao.basic-game.v1";
-const cards: MinionCardDefinition[] = parseMinionCardsFromRecord(cardRecord);
-const catalog = createCatalog(cards);
 const selectedSacrifices = new Set<string>();
 let pending: { handIndex: number; cardId: CardId; sacrificeCount: number } | null = null;
 let suppressAutoOpen = false;
 
+subscribeSession(() => {
+  pending = null;
+  selectedSacrifices.clear();
+  document.querySelector("#sacrifice-placement-overlay")?.remove();
+});
 document.addEventListener("click", interceptSacrificeFlow, true);
 window.addEventListener("cardgame:request-sacrifice", onGestureSacrificeRequest as EventListener);
 
 function onGestureSacrificeRequest(event: CustomEvent<{ handIndex?: number }>): void {
   const handIndex = Number(event.detail?.handIndex);
   if (!Number.isInteger(handIndex)) return;
-  const session = loadSavedSession();
+  const session = readSession();
   if (!session || session.handoffRequired || session.state.winner) return;
   const cardId = session.state.players[session.state.activePlayer].hand[handIndex];
   if (!cardId) return;
@@ -67,7 +67,7 @@ function openFromSelectedHandCard(): void {
 function sacrificeDetailsForElement(element: HTMLElement): { handIndex: number; cardId: CardId; sacrificeCount: number } | null {
   const handIndex = Number(element.dataset.handIndex);
   if (!Number.isInteger(handIndex)) return null;
-  const session = loadSavedSession();
+  const session = readSession();
   if (!session || session.handoffRequired || session.state.winner) return null;
   const cardId = session.state.players[session.state.activePlayer].hand[handIndex];
   if (!cardId) return null;
@@ -79,7 +79,7 @@ function sacrificeDetailsForElement(element: HTMLElement): { handIndex: number; 
 }
 
 function openPicker(details: { handIndex: number; cardId: CardId; sacrificeCount: number }): void {
-  const session = loadSavedSession();
+  const session = readSession();
   const card = catalog.cards.get(details.cardId);
   if (!session || !card) return;
   const player = session.state.players[session.state.activePlayer];
@@ -143,7 +143,7 @@ function updatePickerCount(overlay: HTMLElement): void {
   const confirm = overlay.querySelector<HTMLButtonElement>("#sacrifice-placement-confirm");
   if (confirm) confirm.disabled = selectedSacrifices.size !== pending.sacrificeCount;
 
-  const session = loadSavedSession();
+  const session = readSession();
   if (!session) return;
   const player = session.state.players[session.state.activePlayer];
   const selectedSlots = [...selectedSacrifices]
@@ -159,7 +159,7 @@ function updatePickerCount(overlay: HTMLElement): void {
 
 function resolveSacrificeSummon(overlay: HTMLElement): void {
   if (!pending) return;
-  const fresh = loadSavedSession();
+  const fresh = readSession();
   if (!fresh) return;
   const currentCardId = fresh.state.players[fresh.state.activePlayer].hand[pending.handIndex];
   if (currentCardId !== pending.cardId) {
@@ -168,12 +168,7 @@ function resolveSacrificeSummon(overlay: HTMLElement): void {
   }
 
   const card = catalog.cards.get(pending.cardId);
-  const error = summonIntoSacrificedSlot(
-    fresh,
-    catalog,
-    pending.handIndex,
-    [...selectedSacrifices],
-  );
+  const error = dispatchGame({ type: "sacrifice-summon", handIndex: pending.handIndex, cardId: pending.cardId, sacrifices: [...selectedSacrifices] });
   if (error) {
     showPickerError(overlay, error);
     return;
@@ -182,24 +177,8 @@ function resolveSacrificeSummon(overlay: HTMLElement): void {
   pending = null;
   selectedSacrifices.clear();
   overlay.remove();
-  saveAndSync(fresh);
-  showToast(card ? `「${card.name}」已在献祭位置召唤。` : "献祭召唤完成。");
-}
 
-function saveAndSync(session: BasicGameSession): void {
-  saveSession(session);
-  const value = localStorage.getItem(SAVE_KEY);
-  try {
-    window.dispatchEvent(new StorageEvent("storage", {
-      key: SAVE_KEY,
-      newValue: value,
-      storageArea: localStorage,
-      url: window.location.href,
-    }));
-  } catch {
-    // The persisted session is still correct on engines without constructible StorageEvent.
-  }
-  window.dispatchEvent(new CustomEvent("cardgame:session-updated"));
+  showToast(card ? `「${card.name}」已在献祭位置召唤。` : "献祭召唤完成。");
 }
 
 function sacrificeOption(minion: MinionInstance, slotIndex: number): string {

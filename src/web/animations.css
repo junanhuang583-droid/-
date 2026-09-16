@@ -1,3 +1,4 @@
+@layer legacy {
 .deck-stack {
   position: relative;
   width: clamp(42px, 5vw, 64px);
@@ -104,8 +105,8 @@
 }
 
 .newly-drawn-hidden {
-  opacity: 0 !important;
-  transform: translateY(14px) scale(.9) !important;
+  opacity: 0 ;
+  transform: translateY(14px) scale(.9) ;
   pointer-events: none;
 }
 
@@ -122,5 +123,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hand-card, .board-slot, .hero-panel { transition: none !important; }
+  .hand-card, .board-slot, .hero-panel { transition: none ; }
+}
+
 }

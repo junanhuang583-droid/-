@@ -1,22 +1,16 @@
-import cardRecord from "../../docs/卡牌游戏记录_v0.5.md?raw";
 import {
   canMinionAttack,
-  createCatalog,
-  getSummonRequirement,
-  summonFromHand,
+  getSummonRequirement
 } from "../core/basic-game.js";
-import { parseMinionCardsFromRecord } from "../data/parse-card-record.js";
 import { PROTOTYPE_SPECIAL_BY_ID } from "../data/prototype-special-cards.js";
-import type { CardId, MinionCardDefinition } from "../model/cards.js";
+import type { CardId } from "../model/cards.js";
 import type { MinionInstance, PlayerId, StatusState } from "../model/state.js";
-import { loadSavedSession, saveSession } from "./persistence.js";
-import "./foundation-ab.css";
 import "./foundation-ab-v2.css";
+import "./foundation-ab.css";
+import { byId, catalog } from "./game-catalog.js";
+import { dispatchGame, readSession } from "./session-runtime.js";
+import { onViewRendered } from "./view-events.js";
 
-const SAVE_KEY = "lushizhizao.basic-game.v1";
-const cards: MinionCardDefinition[] = parseMinionCardsFromRecord(cardRecord);
-const catalog = createCatalog(cards);
-const byId = new Map(cards.map((card) => [card.id, card]));
 
 type GestureMode = "peek" | "play";
 
@@ -44,11 +38,8 @@ let handExpanded = false;
 let lastActivePlayer: PlayerId | null = null;
 
 document.body.classList.add("foundation-ab-enabled", "foundation-ab-v2-enabled");
-const app = document.querySelector("#app") ?? document.body;
-new MutationObserver(scheduleSync).observe(app, { childList: true, subtree: true });
+onViewRendered(syncFoundation, 40);
 window.addEventListener("resize", scheduleSync);
-window.addEventListener("storage", scheduleSync);
-window.addEventListener("cardgame:session-updated", scheduleSync);
 document.addEventListener("pointerdown", onGlobalHandPointerDown, true);
 document.addEventListener("pointerdown", onPointerDown, true);
 document.addEventListener("pointermove", onPointerMove, { capture: true, passive: false });
@@ -70,7 +61,7 @@ function scheduleSync(): void {
 }
 
 function syncFoundation(): void {
-  const session = loadSavedSession();
+  const session = readSession();
   const shell = document.querySelector<HTMLElement>(".game-shell");
   if (!session || !shell) return;
 
@@ -112,7 +103,7 @@ function fanHand(): void {
   const count = handCards.length;
   if (count === 0) return;
 
-  const rowWidth = row.getBoundingClientRect().width;
+  const rowWidth = row.clientWidth;
   const available = Math.max(260, rowWidth > 0 ? rowWidth - 12 : Math.min(window.innerWidth * 0.82, 980));
   const baseWidth = window.innerHeight <= 500 ? 82 : window.innerWidth >= 1100 ? 104 : 92;
   const natural = count * baseWidth;
@@ -138,10 +129,10 @@ function onPointerDown(event: PointerEvent): void {
   const target = event.target;
   if (!(target instanceof Element)) return;
   const source = target.closest<HTMLElement>("#active-hand-target .hand-card");
-  if (!source) return;
-  if (document.querySelector(".opening-deal-shield, .overlay, #sacrifice-placement-overlay, #rule-choice-overlay, #unit-effect-overlay")) return;
+  if (!source || source.hasAttribute("disabled")) return;
+  if (document.querySelector(".opening-deal-shield, .draw-animating, .overlay, #sacrifice-placement-overlay, #rule-choice-overlay, #unit-effect-overlay")) return;
 
-  const session = loadSavedSession();
+  const session = readSession();
   if (!session || session.handoffRequired || session.state.winner) return;
   const handIndex = resolveHandIndex(source);
   if (handIndex < 0) return;
@@ -268,7 +259,7 @@ function onPointerCancel(event: PointerEvent): void {
 }
 
 function resolveGestureDrop(current: HandGesture): void {
-  const session = loadSavedSession();
+  const session = readSession();
   if (!session || session.handoffRequired || session.state.winner) return;
   const active = session.state.activePlayer;
   const currentCardId = session.state.players[active].hand[current.handIndex];
@@ -290,12 +281,12 @@ function resolveGestureDrop(current: HandGesture): void {
     if (!current.dropSlot) return;
     const slotIndex = Number(current.dropSlot.dataset.emptySlot);
     if (!Number.isInteger(slotIndex)) return;
-    const error = summonFromHand(session, catalog, current.handIndex, slotIndex);
+    const error = dispatchGame({ type: "summon", handIndex: current.handIndex, slotIndex, cardId: current.cardId });
     if (error) {
       showToast(error);
       return;
     }
-    saveAndSync(session);
+
     showToast(`已召唤「${minion.name}」。`);
     return;
   }
@@ -439,7 +430,7 @@ function onMinionClick(event: MouseEvent): void {
   const instanceId = minionElement.dataset.minionId;
   const owner = minionElement.dataset.owner as PlayerId | undefined;
   if (!instanceId || !owner) return;
-  const session = loadSavedSession();
+  const session = readSession();
   if (!session) return;
   const minion = findMinion(session, owner, instanceId);
   if (!minion) return;
@@ -450,7 +441,7 @@ function onMinionClick(event: MouseEvent): void {
   showMinionInspector(minionElement, minion, owner, session);
 }
 
-function showMinionInspector(anchor: HTMLElement, minion: MinionInstance, owner: PlayerId, session: NonNullable<ReturnType<typeof loadSavedSession>>): void {
+function showMinionInspector(anchor: HTMLElement, minion: MinionInstance, owner: PlayerId, session: NonNullable<ReturnType<typeof readSession>>): void {
   closeMinionInspector();
   const card = byId.get(minion.cardId);
   const attack = Math.max(0, (card?.attack ?? 0) + minion.attackModifier);
@@ -504,7 +495,7 @@ function showMinionInspector(anchor: HTMLElement, minion: MinionInstance, owner:
   });
 }
 
-function actionStateText(minion: MinionInstance, session: NonNullable<ReturnType<typeof loadSavedSession>>, owner: PlayerId, remaining: number, max: number): string {
+function actionStateText(minion: MinionInstance, session: NonNullable<ReturnType<typeof readSession>>, owner: PlayerId, remaining: number, max: number): string {
   if (owner !== session.state.activePlayer) return "等待对方回合";
   if (session.handoffRequired) return "等待回合交接";
   if (minion.summonedOnTurn === session.state.turn && !minion.statuses.some((status) => status.keyword === "haste")) return "刚上场 · 本回合不能攻击";
@@ -513,7 +504,7 @@ function actionStateText(minion: MinionInstance, session: NonNullable<ReturnType
   return `当前不可攻击 · 剩余 ${remaining}/${max} 次`;
 }
 
-function formatStatus(status: StatusState, session: NonNullable<ReturnType<typeof loadSavedSession>>, minion: MinionInstance): string {
+function formatStatus(status: StatusState, session: NonNullable<ReturnType<typeof readSession>>, minion: MinionInstance): string {
   const labels: Record<string, string> = {
     fast_attack: "快攻",
     haste: "迅疾",
@@ -568,7 +559,7 @@ function closeMinionInspector(): void {
   document.querySelector("#ab-minion-inspector")?.remove();
 }
 
-function findMinion(session: NonNullable<ReturnType<typeof loadSavedSession>>, owner: PlayerId, instanceId: string): MinionInstance | null {
+function findMinion(session: NonNullable<ReturnType<typeof readSession>>, owner: PlayerId, instanceId: string): MinionInstance | null {
   const player = session.state.players[owner];
   return player.board.find((minion) => minion?.instanceId === instanceId) ?? player.overflowMinions.find((minion) => minion.instanceId === instanceId) ?? null;
 }
@@ -623,22 +614,6 @@ function resolveHandIndex(source: HTMLElement): number {
   const row = source.parentElement;
   if (!row) return -1;
   return [...row.querySelectorAll<HTMLElement>(".hand-card")].indexOf(source);
-}
-
-function saveAndSync(session: NonNullable<ReturnType<typeof loadSavedSession>>): void {
-  saveSession(session);
-  const value = localStorage.getItem(SAVE_KEY);
-  try {
-    window.dispatchEvent(new StorageEvent("storage", {
-      key: SAVE_KEY,
-      newValue: value,
-      storageArea: localStorage,
-      url: window.location.href,
-    }));
-  } catch {
-    window.dispatchEvent(new CustomEvent("cardgame:session-updated"));
-  }
-  window.dispatchEvent(new CustomEvent("cardgame:session-updated"));
 }
 
 function removeLegacyPreviews(): void {

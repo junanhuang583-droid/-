@@ -1,58 +1,31 @@
+import { isSession } from "../application/validation.js";
 import type { BasicGameSession } from "../core/basic-game.js";
 
-const SAVE_KEY = "lushizhizao.basic-game.v1";
-const BACKUP_KEY = "lushizhizao.basic-game.v1.backup";
+export const SAVE_KEY = "lushizhizao.basic-game.v1";
+export const BACKUP_KEY = `${SAVE_KEY}.backup`;
+export interface StoragePort { getItem(key: string): string | null; setItem(key: string, value: string): void; }
 
-export function loadSavedSession(): BasicGameSession | null {
-  return parseStored(localStorage.getItem(SAVE_KEY)) ?? parseStored(localStorage.getItem(BACKUP_KEY));
-}
-
-export function saveSession(session: BasicGameSession): void {
-  session.updatedAt = new Date().toISOString();
-  const serialized = JSON.stringify(session);
-  const previous = localStorage.getItem(SAVE_KEY);
-  if (previous) localStorage.setItem(BACKUP_KEY, previous);
-  localStorage.setItem(SAVE_KEY, serialized);
-}
-
-export function clearSavedSession(): void {
-  localStorage.removeItem(SAVE_KEY);
-  localStorage.removeItem(BACKUP_KEY);
-}
-
-export function installPersistenceGuards(getSession: () => BasicGameSession): () => void {
-  const saveNow = () => {
-    try {
-      saveSession(getSession());
-    } catch (error) {
-      console.error("保存对局失败", error);
-    }
-  };
-
-  const onVisibilityChange = () => {
-    if (document.visibilityState === "hidden") saveNow();
-  };
-
-  document.addEventListener("visibilitychange", onVisibilityChange);
-  window.addEventListener("pagehide", saveNow);
-  window.addEventListener("beforeunload", saveNow);
-  const timer = window.setInterval(saveNow, 5000);
-
-  return () => {
-    document.removeEventListener("visibilitychange", onVisibilityChange);
-    window.removeEventListener("pagehide", saveNow);
-    window.removeEventListener("beforeunload", saveNow);
-    window.clearInterval(timer);
-  };
-}
-
-function parseStored(value: string | null): BasicGameSession | null {
+/** The v1 disk format is retained. Invalid primaries never overwrite a good backup. */
+export function parseStored(value: string | null): BasicGameSession | null {
   if (!value) return null;
   try {
-    const parsed = JSON.parse(value) as Partial<BasicGameSession>;
-    if (parsed.schemaVersion !== 1 || !parsed.state || !parsed.gameId) return null;
-    return parsed as BasicGameSession;
-  } catch {
-    return null;
+    const parsed: unknown = JSON.parse(value);
+    if (!isSession(parsed)) return null;
+    parsed.pendingEffects ??= [];
+    return parsed;
+  } catch { return null; }
+}
+
+export function restoreSession(storage: StoragePort): BasicGameSession | null {
+  return parseStored(storage.getItem(SAVE_KEY)) ?? parseStored(storage.getItem(BACKUP_KEY));
+}
+
+export function persistSession(storage: StoragePort, session: BasicGameSession): void {
+  const serialized = JSON.stringify(session);
+  const previous = storage.getItem(SAVE_KEY);
+  // Backup rotation may exceed quota; a primary write is still worth attempting.
+  if (previous && parseStored(previous)) {
+    try { storage.setItem(BACKUP_KEY, previous); } catch { /* Keep the previous backup. */ }
   }
+  storage.setItem(SAVE_KEY, serialized);
 }

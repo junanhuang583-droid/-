@@ -1,22 +1,14 @@
-import { PROTOTYPE_SPECIAL_BY_ID, PROTOTYPE_SPECIAL_DECK } from "../data/prototype-special-cards.js";
+import { PROTOTYPE_SPECIAL_BY_ID } from "../data/prototype-special-cards.js";
 import type { CardId } from "../model/cards.js";
-import { loadSavedSession, saveSession } from "./persistence.js";
 import "./prototype-special-cards.css";
+import { readSession } from "./session-runtime.js";
+import { onViewRendered } from "./view-events.js";
 
-const SAVE_KEY = "lushizhizao.basic-game.v1";
-const META_KEY = "cardgame.prototype-special-cards.v1";
 let scheduled = false;
 let selectedSpecialIndex: number | null = null;
 
-interface MetaState {
-  gameId: string;
-  injected: boolean;
-}
 
-const root = document.querySelector("#app") ?? document.body;
-new MutationObserver(scheduleSync).observe(root, { childList: true, subtree: true });
-window.addEventListener("storage", scheduleSync);
-window.addEventListener("cardgame:session-updated", scheduleSync);
+onViewRendered(sync, 20);
 document.addEventListener("click", onDocumentClick, true);
 scheduleSync();
 
@@ -30,49 +22,17 @@ function scheduleSync(): void {
 }
 
 function sync(): void {
-  const session = loadSavedSession();
+  const session = readSession();
   if (!session) {
     removePreview();
     return;
   }
 
-  if (!document.querySelector(".game-shell.opening-deal")) {
-    ensureInjected(session);
-  }
+
 
   decorateDeckInfo();
   decorateSpecialCards(session.state.players[session.state.activePlayer].hand);
   syncSpecialPreview(session.state.players[session.state.activePlayer].hand);
-}
-
-function ensureInjected(session: ReturnType<typeof loadSavedSession> extends infer T ? Exclude<T, null> : never): void {
-  const meta = loadMeta();
-  if (meta?.gameId === session.gameId && meta.injected) return;
-
-  session.state.sharedDeck.push(...PROTOTYPE_SPECIAL_DECK);
-  shuffle(session.state.sharedDeck);
-  session.log.push({
-    at: new Date().toISOString(),
-    turn: session.state.turn,
-    text: "原型效果卡加入共享牌库：普通进化石×10、普通攻击×10。普通攻击的伤害与目标规则尚未录入，当前不可结算。",
-  });
-  if (session.log.length > 300) session.log.splice(0, session.log.length - 300);
-
-  localStorage.setItem(META_KEY, JSON.stringify({ gameId: session.gameId, injected: true } satisfies MetaState));
-  saveSession(session);
-  dispatchSessionSync();
-}
-
-function loadMeta(): MetaState | null {
-  try {
-    const raw = localStorage.getItem(META_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<MetaState>;
-    if (typeof parsed.gameId === "string" && parsed.injected === true) return parsed as MetaState;
-  } catch {
-    // Rebuild on the next sync.
-  }
-  return null;
 }
 
 function decorateDeckInfo(): void {
@@ -97,7 +57,8 @@ function decorateSpecialCards(hand: CardId[]): void {
     const definition = id ? PROTOTYPE_SPECIAL_BY_ID.get(id) : undefined;
     if (!definition) return;
 
-    button.disabled = false;
+    const state = readSession();
+    button.disabled = state.handoffRequired || Boolean(state.state.winner) || Boolean(document.querySelector(".opening-deal, .draw-animating"));
     button.dataset.prototypeHandIndex = String(index);
     button.dataset.prototypeCardId = definition.id;
     button.classList.add(
@@ -211,20 +172,6 @@ function positionPreview(selected: HTMLElement, preview: HTMLElement): void {
 
 function removePreview(): void {
   document.querySelector("#prototype-special-preview")?.remove();
-}
-
-function dispatchSessionSync(): void {
-  const value = localStorage.getItem(SAVE_KEY);
-  try {
-    window.dispatchEvent(new StorageEvent("storage", {
-      key: SAVE_KEY,
-      newValue: value,
-      storageArea: localStorage,
-      url: window.location.href,
-    }));
-  } catch {
-    window.dispatchEvent(new CustomEvent("cardgame:session-updated"));
-  }
 }
 
 function shuffle<T>(items: T[]): void {

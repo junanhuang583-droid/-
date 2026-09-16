@@ -1,18 +1,13 @@
-import cardRecord from "../../docs/卡牌游戏记录_v0.5.md?raw";
-import { parseMinionCardsFromRecord } from "../data/parse-card-record.js";
 import { PROTOTYPE_SPECIAL_BY_ID } from "../data/prototype-special-cards.js";
-import type { CardId, MinionCardDefinition } from "../model/cards.js";
-import { loadSavedSession } from "./persistence.js";
-import "./foundation-cd.css";
+import type { CardId } from "../model/cards.js";
+import { byId } from "./game-catalog.js";
+import "./legacy-card-visuals.css";
+import { readSession } from "./session-runtime.js";
+import { onViewRendered } from "./view-events.js";
 
-const cards: MinionCardDefinition[] = parseMinionCardsFromRecord(cardRecord);
-const byId = new Map<CardId, MinionCardDefinition>(cards.map((card) => [card.id, card]));
-const app = document.querySelector("#app") ?? document.body;
 let scheduled = false;
 
-new MutationObserver(scheduleSync).observe(app, { childList: true, subtree: true });
-window.addEventListener("storage", scheduleSync);
-window.addEventListener("cardgame:session-updated", scheduleSync);
+onViewRendered(sync, 30);
 window.addEventListener("resize", scheduleSync);
 scheduleSync();
 
@@ -26,7 +21,7 @@ function scheduleSync(): void {
 }
 
 function sync(): void {
-  const session = loadSavedSession();
+  const session = readSession();
   const shell = document.querySelector<HTMLElement>(".game-shell");
   if (!session || !shell) {
     clearPrivateHand();
@@ -88,7 +83,7 @@ function decorateHand(hand: CardId[]): void {
   });
 }
 
-function decorateBattleMinions(session: NonNullable<ReturnType<typeof loadSavedSession>>): void {
+function decorateBattleMinions(session: NonNullable<ReturnType<typeof readSession>>): void {
   document.querySelectorAll<HTMLElement>(".board-slot.minion").forEach((element) => {
     element.classList.add("cd-battle-unit", "ef-battle-unit");
     element.classList.remove("ef-series-base", "ef-series-dragon", "ef-series-prehistoric");

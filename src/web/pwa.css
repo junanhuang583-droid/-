@@ -1,3 +1,4 @@
+@layer legacy {
 .pwa-controls {
   position: fixed;
   z-index: 90;
@@ -62,7 +63,7 @@
   backdrop-filter: blur(10px);
 }
 
-.pwa-install-help[hidden] { display: none !important; }
+.pwa-install-help[hidden] { display: none ; }
 
 .pwa-install-card {
   position: relative;
@@ -161,13 +162,13 @@ body.pwa-standalone .game-topbar {
 
 body.is-fullscreen .game-shell,
 body.pwa-standalone .game-shell {
-  grid-template-rows: minmax(0, 1fr) clamp(112px, 22dvh, 196px) !important;
-  gap: 4px !important;
+  grid-template-rows: minmax(0, 1fr) clamp(112px, 22dvh, 196px) ;
+  gap: 4px ;
   padding:
     max(4px, env(safe-area-inset-top))
     max(5px, env(safe-area-inset-right))
     max(4px, env(safe-area-inset-bottom))
-    max(5px, env(safe-area-inset-left)) !important;
+    max(5px, env(safe-area-inset-left)) ;
 }
 
 body.is-fullscreen .battle-shell,
@@ -222,7 +223,7 @@ body.pwa-standalone .pwa-controls {
 
   body.is-fullscreen .game-shell,
   body.pwa-standalone .game-shell {
-    grid-template-rows: minmax(0, 1fr) 116px !important;
+    grid-template-rows: minmax(0, 1fr) 116px ;
   }
 
   body.is-fullscreen .battle-shell,
@@ -235,7 +236,7 @@ body.pwa-standalone .pwa-controls {
 @media (orientation: landscape) and (min-height: 700px) {
   body.is-fullscreen .game-shell,
   body.pwa-standalone .game-shell {
-    grid-template-rows: minmax(0, 1fr) clamp(170px, 24dvh, 230px) !important;
+    grid-template-rows: minmax(0, 1fr) clamp(170px, 24dvh, 230px) ;
   }
 
   body.is-fullscreen .battle-shell,
@@ -250,12 +251,14 @@ body.pwa-standalone .pwa-controls {
    Legacy mode-specific grid sizing is intentionally neutralized here. */
 body.is-fullscreen .game-shell,
 body.pwa-standalone .game-shell {
-  padding: 0 !important;
+  padding: 0 ;
 }
 
 body.is-fullscreen .battlefield-coordinate-layer > .battle-shell,
 body.pwa-standalone .battlefield-coordinate-layer > .battle-shell {
-  grid-template-columns: 13.5cqw minmax(0, 1fr) 14.5cqw !important;
-  grid-template-rows: minmax(0, 1fr) 5cqh minmax(0, 1fr) !important;
-  gap: .65cqw !important;
+  grid-template-columns: 13.5cqw minmax(0, 1fr) 14.5cqw ;
+  grid-template-rows: minmax(0, 1fr) 5cqh minmax(0, 1fr) ;
+  gap: .65cqw ;
+}
+
 }

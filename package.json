@@ -1,6 +1,6 @@
 {
   "name": "card-game-electronization",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,12 +13,16 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "materialize:battlefield": "node scripts/materialize-battlefield.mjs",
-    "materialize:stage07-ui": "node scripts/materialize-stage07-ui.mjs"
+    "materialize:stage07-ui": "node scripts/materialize-stage07-ui.mjs",
+    "postbuild": "node scripts/build-service-worker.mjs",
+    "test:browser": "playwright test",
+    "check": "npm run typecheck && npm test && npm run build"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
-    "typescript": "^5.9.0",
-    "vite": "^7.1.0",
-    "vitest": "^3.2.0"
+    "@playwright/test": "1.58.2",
+    "@types/node": "24.13.5",
+    "typescript": "5.9.3",
+    "vite": "7.3.6",
+    "vitest": "3.2.7"
   }
 }

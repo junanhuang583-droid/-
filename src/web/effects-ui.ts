@@ -1,6 +1,6 @@
-import cardRecord from "../../docs/卡牌游戏记录_v0.5.md?raw";
-import { parseMinionCardsFromRecord } from "../data/parse-card-record.js";
 import type { Keyword } from "../model/cards.js";
+import { byId } from "./game-catalog.js";
+import { onViewRendered } from "./view-events.js";
 
 const LABELS: Partial<Record<Keyword, string>> = {
   haste: "迅疾",
@@ -13,45 +13,21 @@ const LABELS: Partial<Record<Keyword, string>> = {
   lifesteal: "吸血",
 };
 
-const cards = parseMinionCardsFromRecord(cardRecord);
-const byId = new Map(cards.map((card) => [card.id, card]));
-const byName = new Map(cards.map((card) => [card.name, card]));
-let scheduled = false;
-
 installStyles();
-applyEnhancements();
-new MutationObserver(() => scheduleEnhancements()).observe(document.querySelector("#app") ?? document.body, {
-  childList: true,
-  subtree: true,
-});
-
-function scheduleEnhancements(): void {
-  if (scheduled) return;
-  scheduled = true;
-  queueMicrotask(() => {
-    scheduled = false;
-    applyEnhancements();
-  });
-}
+onViewRendered(applyEnhancements, 50);
 
 function applyEnhancements(): void {
-  const note = document.querySelector<HTMLElement>(".mode-note");
-  if (note && note.dataset.firstWave !== "true") {
-    note.dataset.firstWave = "true";
-    note.textContent = "已启用：扣血召唤、迅疾、快攻、嘲讽、狂妄、守护、甲一/甲二、吸血。进化石、献祭、亡语、汲取、沉睡/冰冻/石化、装备和场景等仍暂不结算。";
-  }
-
   document.querySelectorAll<HTMLElement>(".hand-card").forEach((element) => {
     if (element.querySelector(".implemented-keywords")) return;
-    const id = element.querySelector<HTMLElement>(".card-id")?.textContent?.trim();
+    const id = element.dataset.cardId;
     const card = id ? byId.get(id as `C${string}`) : undefined;
     appendBadges(element, card?.effects.flatMap((effect) => effect.keyword ? [effect.keyword] : []) ?? []);
   });
 
   document.querySelectorAll<HTMLElement>(".board-slot.minion").forEach((element) => {
     if (element.querySelector(".implemented-keywords")) return;
-    const name = element.querySelector("strong")?.textContent?.trim();
-    const card = name ? byName.get(name) : undefined;
+    const id = element.dataset.cardId;
+    const card = id ? byId.get(id as `C${string}`) : undefined;
     appendBadges(element, card?.effects.flatMap((effect) => effect.keyword ? [effect.keyword] : []) ?? []);
   });
 }

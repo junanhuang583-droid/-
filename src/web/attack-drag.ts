@@ -1,15 +1,9 @@
-import cardRecord from "../../docs/卡牌游戏记录_v0.5.md?raw";
-import { attackHero, attackMinion, canMinionAttack, createCatalog } from "../core/basic-game.js";
-import { parseMinionCardsFromRecord } from "../data/parse-card-record.js";
-import type { MinionCardDefinition } from "../model/cards.js";
+import { canMinionAttack } from "../core/basic-game.js";
 import type { MinionInstance, PlayerId, StatusState } from "../model/state.js";
-import { loadSavedSession, saveSession } from "./persistence.js";
 import "./attack-drag.css";
+import { byId, catalog } from "./game-catalog.js";
+import { dispatchGame, readSession } from "./session-runtime.js";
 
-const SAVE_KEY = "lushizhizao.basic-game.v1";
-const cards: MinionCardDefinition[] = parseMinionCardsFromRecord(cardRecord);
-const catalog = createCatalog(cards);
-const byId = new Map(cards.map((card) => [card.id, card]));
 
 interface AttackGesture {
   pointerId: number;
@@ -47,7 +41,7 @@ function onPointerDown(event: PointerEvent): void {
   if (!source) return;
   if (document.querySelector(".opening-deal-shield, .overlay, #sacrifice-placement-overlay, #rule-choice-overlay, #unit-effect-overlay")) return;
 
-  const session = loadSavedSession();
+  const session = readSession();
   if (!session || session.handoffRequired || session.state.winner) return;
   const attackerId = source.dataset.minionId;
   const owner = source.dataset.owner as PlayerId | undefined;
@@ -102,7 +96,7 @@ function beginAttackDrag(current: AttackGesture): void {
   const name = cardId ? byId.get(cardId as MinionInstance["cardId"])?.name ?? fallbackName : fallbackName;
   const ghost = document.createElement("div");
   ghost.className = "attack-drag-ghost";
-  ghost.innerHTML = `<span>${escapeHtml(name.slice(0,1))}</span><small>攻击</small>`;
+  ghost.innerHTML = `<span>${escapeHtml(name.slice(0, 1))}</span><small>攻击</small>`;
   document.body.append(ghost);
   current.ghost = ghost;
 
@@ -170,7 +164,7 @@ function updateTarget(current: AttackGesture): void {
 
 function markLegalTargets(current: AttackGesture): void {
   clearLegalTargets();
-  const session = loadSavedSession();
+  const session = readSession();
   if (!session) return;
   const attacker = findMinion(session, current.owner, current.attackerId);
   if (!attacker) return;
@@ -207,22 +201,22 @@ function onPointerCancel(event: PointerEvent): void {
 
 function resolveAttack(current: AttackGesture): void {
   if (!current.targetKind) return;
-  const session = loadSavedSession();
+  const session = readSession();
   if (!session || session.handoffRequired || session.state.winner) return;
   if (!findMinion(session, current.owner, current.attackerId)) return;
 
   let error: string | null = null;
   if (current.targetKind === "hero") {
-    error = attackHero(session, catalog, current.attackerId);
+    error = dispatchGame({ type: "attack-hero", attackerId: current.attackerId });
   } else if (current.targetId) {
-    error = attackMinion(session, catalog, current.attackerId, current.targetId);
+    error = dispatchGame({ type: "attack-minion", attackerId: current.attackerId, targetId: current.targetId });
   }
 
   if (error) {
     showToast(error);
     return;
   }
-  saveAndSync(session);
+
 }
 
 function suppressClickAfterDrag(event: MouseEvent): void {
@@ -257,12 +251,12 @@ function clearLegalTargets(): void {
   });
 }
 
-function hasKeyword(minion: MinionInstance, keyword: string, session: NonNullable<ReturnType<typeof loadSavedSession>>): boolean {
+function hasKeyword(minion: MinionInstance, keyword: string, session: NonNullable<ReturnType<typeof readSession>>): boolean {
   if (isStatusActive(minion.statuses, "petrify", session, minion.controller)) return false;
   return minion.statuses.some((status) => status.keyword === keyword && (keyword !== "guard" || (status.charges ?? 0) > 0));
 }
 
-function isStatusActive(statuses: StatusState[], keyword: string, session: NonNullable<ReturnType<typeof loadSavedSession>>, player: PlayerId): boolean {
+function isStatusActive(statuses: StatusState[], keyword: string, session: NonNullable<ReturnType<typeof readSession>>, player: PlayerId): boolean {
   const ownTurn = session.turnsStarted[player];
   return statuses.some((status) => {
     if (status.keyword !== keyword) return false;
@@ -273,20 +267,9 @@ function isStatusActive(statuses: StatusState[], keyword: string, session: NonNu
   });
 }
 
-function findMinion(session: NonNullable<ReturnType<typeof loadSavedSession>>, owner: PlayerId, instanceId: string): MinionInstance | null {
+function findMinion(session: NonNullable<ReturnType<typeof readSession>>, owner: PlayerId, instanceId: string): MinionInstance | null {
   const player = session.state.players[owner];
   return player.board.find((minion) => minion?.instanceId === instanceId) ?? player.overflowMinions.find((minion) => minion.instanceId === instanceId) ?? null;
-}
-
-function saveAndSync(session: NonNullable<ReturnType<typeof loadSavedSession>>): void {
-  saveSession(session);
-  const value = localStorage.getItem(SAVE_KEY);
-  try {
-    window.dispatchEvent(new StorageEvent("storage", { key: SAVE_KEY, newValue: value, storageArea: localStorage, url: window.location.href }));
-  } catch {
-    window.dispatchEvent(new CustomEvent("cardgame:session-updated"));
-  }
-  window.dispatchEvent(new CustomEvent("cardgame:session-updated"));
 }
 
 function showToast(message: string): void {
@@ -304,5 +287,5 @@ function otherPlayer(playerId: PlayerId): PlayerId {
 }
 
 function escapeHtml(value: string): string {
-  return value.replace(/[&<>'\"]/g, (char) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", "'":"&#39;", '"':"&quot;" })[char] ?? char);
+  return value.replace(/[&<>'\"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char] ?? char);
 }

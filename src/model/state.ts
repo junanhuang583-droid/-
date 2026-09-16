@@ -45,6 +45,8 @@ export interface DeathRecord {
   instanceId: string;
   cause: "damage" | "sacrifice" | "execution" | "other";
   canRevive: boolean;
+  controllerAtDeath?: PlayerId;
+  deathrattleSuppressed?: boolean;
 }
 
 export interface GameState {

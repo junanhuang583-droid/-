@@ -1,3 +1,4 @@
+@layer legacy {
 /* Prototype special-card presentation. Keeps unconfirmed mechanics visible but inert. */
 
 .prototype-deck-chip {
@@ -54,10 +55,10 @@
 .prototype-attack-card .prototype-special-art { color: #ffc09c; text-shadow: 0 0 14px rgba(226,112,70,.38); }
 .prototype-special-card > strong { font-size: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .prototype-special-type { color: #a99a88; font-size: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.prototype-special-card > small { color: #d8c5a8 !important; display: block !important; font-size: 6px !important; }
+.prototype-special-card > small { color: #d8c5a8 ; display: block ; font-size: 6px ; }
 .game-shell.tabletop-theme .hand-row .prototype-special-card.prototype-selected {
-  z-index: 74 !important;
-  transform: translateY(-18px) rotate(0deg) scale(1.08) !important;
+  z-index: 74 ;
+  transform: translateY(-18px) rotate(0deg) scale(1.08) ;
   box-shadow: 0 0 0 2px rgba(207,173,108,.22),0 16px 28px rgba(0,0,0,.52);
 }
 
@@ -169,4 +170,6 @@
   .prototype-preview-section { padding:5px; }
   .prototype-preview-section p,.prototype-preview-section b { font-size:7px; }
   .prototype-deck-chip { display:none; }
+}
+
 }
