@@ -1,0 +1,55 @@
+name: Recover and verify engineering baseline
+on:
+  push:
+    branches: [refactor/engineering-baseline-v1]
+    paths: [.github/workflows/baseline-bootstrap.yml]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  recover-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/engineering-baseline-v1
+      - name: Recover immutable dependency-lock seed
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 10458189702
+          run-id: 35124664221
+          github-token: ${{ github.token }}
+          path: _baseline_seed
+          merge-multiple: true
+      - name: Validate and apply source migration
+        run: |
+          test "${GITHUB_REF_NAME}" = "refactor/engineering-baseline-v1"
+          tar -xOf _baseline_seed/baseline-workspace.tar.gz ./package-lock.json > package-lock.json
+          python .baseline/apply.py
+          rm -rf _baseline_seed .baseline
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'refactor: consolidate rules, single state owner and battlefield engineering baseline'
+          git push origin HEAD:refactor/engineering-baseline-v1
+          echo "SOURCE_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        with: {node-version: 22, cache: npm}
+      - run: npm ci
+      - run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - name: Capture exact source and acceptance evidence
+        if: always()
+        run: |
+          mkdir -p test-results
+          git rev-parse HEAD > test-results/source-commit.txt
+          cp dist/build-info.json test-results/build-info.json || true
+          git archive -o test-results/tested-source.tar.gz HEAD
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: recovered-engineering-acceptance
+          path: test-results
+          retention-days: 14
