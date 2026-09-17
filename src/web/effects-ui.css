@@ -1,0 +1,26 @@
+/* Keyword decoration owns only its children. Parent card and unit geometry
+   belongs to battlefield-layout.css, never to a dynamically injected skin. */
+.implemented-keywords {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 4px;
+  z-index: 4;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  pointer-events: none;
+}
+.implemented-keywords span {
+  padding: 1px 3px;
+  border: 1px solid rgba(215, 174, 101, .55);
+  border-radius: 999px;
+  background: rgba(18, 15, 12, .82);
+  color: #ebd6ae;
+  font-size: 6px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+@media (min-height: 600px) {
+  .implemented-keywords span { font-size: 7px; padding: 2px 4px; }
+}
