@@ -25,7 +25,7 @@ body { min-width: 320px; background: #080b10; }
 .battle-shell .hero-panel, .battle-shell .board-slot { pointer-events: auto; }
 .hero-panel {
   position: absolute; left: 50%; top: var(--opponent-hero-y); bottom: auto;
-  width: 146px; height: 55px; min-height: 0; padding: 0; gap: 7px;
+  width: 146px; height: var(--hero-height); min-height: 0; padding: 0; gap: 7px;
   display: grid; grid-template-columns: 48px 1fr; grid-template-rows: 1fr;
   transform: translate(-50%, -50%); background: transparent; border: 0;
   box-shadow: none; z-index: var(--layer-units);

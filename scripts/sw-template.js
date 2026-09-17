@@ -8,8 +8,7 @@ self.addEventListener("install", (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
     try {
-      // Install is atomic from the application's point of view. A broken asset
-      // rejects the new worker, so the previous working shell remains active.
+      // A broken mandatory asset rejects the new worker. Keep the old shell.
       await cache.addAll(PRECACHE.map((path) => new Request(new URL(path, self.registration.scope), { cache: "reload" })));
       await self.skipWaiting();
     } catch (error) {
@@ -45,16 +44,19 @@ self.addEventListener("fetch", (event) => {
     const cache = await caches.open(CACHE_NAME);
     const cached = await cache.match(request);
     if (cached) return cached;
+    let response;
     try {
-      return await fetch(request);
-    } catch {
-      for (const key of await caches.keys()) {
-        if (!key.startsWith(CACHE_PREFIX)) continue;
-        const older = await (await caches.open(key)).match(request);
-        if (older) return older;
-      }
-      // Never substitute HTML for a missing script/image request.
-      return Response.error();
+      response = await fetch(request);
+      if (response.ok) return response;
+    } catch { /* Network failure and HTTP failure both allow exact old assets. */ }
+    // Pages may delete the previous build's hashed assets while its tab is
+    // still open. HTTP 404 does not throw, so it must reach this fallback too.
+    for (const key of await caches.keys()) {
+      if (!key.startsWith(CACHE_PREFIX)) continue;
+      const older = await (await caches.open(key)).match(request);
+      if (older) return older;
     }
+    // Never substitute index.html for a missing script or image.
+    return response ?? Response.error();
   })());
 });

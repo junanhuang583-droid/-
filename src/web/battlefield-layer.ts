@@ -1,4 +1,4 @@
-import { BATTLEFIELD, FIXED_SOCKETS, battlefieldTransform } from "../application/battlefield-geometry.js";
+import { BATTLEFIELD, FIXED_SOCKETS, battlefieldTransform, gameplayGeometry } from "../application/battlefield-geometry.js";
 import "./battlefield-layout.css";
 import { onViewRendered } from "./view-events.js";
 
@@ -17,6 +17,7 @@ function syncViewport(): void {
   if (!width || !height) return;
   const t = battlefieldTransform(width, height);
   const v = t.visible;
+  const layout = gameplayGeometry(t);
   plane.style.width = `${BATTLEFIELD.width}px`;
   plane.style.height = `${BATTLEFIELD.height}px`;
   plane.style.transform = `translate(${t.offsetX}px, ${t.offsetY}px) scale(${t.scale})`;
@@ -25,14 +26,15 @@ function syncViewport(): void {
     "end-turn-x": FIXED_SOCKETS.endTurn.x, "end-turn-y": FIXED_SOCKETS.endTurn.y,
     "scene-y": FIXED_SOCKETS.scene.y,
     "view-left": v.x, "view-top": v.y, "view-width": v.width, "view-height": v.height,
-    "opponent-hero-y": v.y + v.height * .08,
-    "opponent-line-y": v.y + v.height * .215,
-    "active-line-y": v.y + v.height * .54,
-    "active-hero-y": v.y + v.height * .705,
-    "hand-bottom-y": v.y + v.height,
-    "unit-width": Math.min(96, v.height * .152),
-    "unit-height": Math.min(86, v.height * .165),
-    "unit-step": Math.min(106, v.height * .17),
+    "hero-height": layout.heroHeight,
+    "opponent-hero-y": layout.opponentHeroY,
+    "opponent-line-y": layout.opponentLineY,
+    "active-line-y": layout.activeLineY,
+    "active-hero-y": layout.activeHeroY,
+    "hand-bottom-y": layout.handBottomY,
+    "unit-width": layout.unitWidth,
+    "unit-height": layout.unitHeight,
+    "unit-step": layout.unitStep,
   })) plane.style.setProperty(`--${key}`, `${value}px`);
   plane.style.setProperty("--world-scale", String(t.scale));
   plane.dataset.viewportScale = String(t.scale);
