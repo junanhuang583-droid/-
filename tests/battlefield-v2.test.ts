@@ -52,11 +52,15 @@ describe('V2 presentation registration, not another rule engine', () => {
     const html=turnView(true);
     expect(html).toContain('id="end-turn" type="button" aria-label="结束回合" disabled');
     expect(html).toContain('class="end-turn-label">结束回合</span>');
+    expect(html).toContain('data-turn-face-panel="front"');
+    expect(html).toContain('data-turn-face-panel="back"');
+    expect(html).toContain('turn-core-back');
     expect(html.indexOf('class="v2-turn-rim"')).toBeGreaterThan(html.indexOf('</button>'));
     expect(html).not.toContain('end-turn-device');
   });
   it('provides versioned transport URLs and stable relative registrations', () => {
-    expect(v2Asset('card-back-final')).toMatch(/^\.\/assets\/battlefield-v2\/v2-2c-[a-f0-9]{12}\/card-back-final\.webp$/);
+    expect(v2Asset('card-back-final')).toMatch(/^\.\/assets\/battlefield-v2\/v2-3a1-[a-f0-9]{12}\/card-back-final\.webp$/);
+    expect(v2Asset('turn-core-back')).toMatch(/^\.\/assets\/battlefield-v2\/v2-3a1-[a-f0-9]{12}\/turn-core-back\.webp$/);
     expect(relativeRect(V2.card,V2.card)).toBe('left:0%;top:0%;width:100%;height:100%');
   });
 });

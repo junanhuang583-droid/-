@@ -21,9 +21,14 @@ export function deckView(count: number): string {
 export function turnView(disabled: boolean): string {
   return `<div class="v2-turn" data-battlefield-anchor="turn-actions" style="${fixedRect(V2.turnInput)}">
     <button id="end-turn" type="button" aria-label="结束回合" ${disabled?'disabled':''}>
-      <span class="v2-turn-core" data-flip-axis="x" style="${relativeRect(V2.core,V2.turnInput)}">
-        ${img('turn-core-front-neutral','v2-turn-neutral')}${img('turn-core-light','v2-turn-light')}
-        <span class="end-turn-label">结束回合</span>
+      <span class="v2-turn-core" data-flip-axis="x" data-turn-face="front" style="${relativeRect(V2.core,V2.turnInput)}">
+        <span class="v2-turn-face v2-turn-face-front" data-turn-face-panel="front">
+          ${img('turn-core-front-neutral','v2-turn-neutral')}${img('turn-core-light','v2-turn-light')}
+          <span class="end-turn-label">结束回合</span>
+        </span>
+        <span class="v2-turn-face v2-turn-face-back" data-turn-face-panel="back" aria-hidden="true">
+          ${img('turn-core-back','v2-turn-back')}
+        </span>
       </span>
     </button>
     ${img('turn-rim','v2-turn-rim',relativeRect(V2.housing,V2.turnInput))}
