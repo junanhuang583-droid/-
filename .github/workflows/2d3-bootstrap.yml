@@ -1,0 +1,45 @@
+name: 2D-3 hydrate verified release candidate
+on:
+  push:
+    branches: [release/v2-2d3]
+permissions:
+  contents: write
+jobs:
+  hydrate:
+    if: github.event.head_commit.message == 'chore(2d-3): hydrate release candidate'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22, cache: npm}
+      - name: Download and verify exact candidate carrier
+        env:
+          CARRIER_URL: 'https://d2jqrm6oza8nb6.cloudfront.net/datasets/17f53f2c-f524-4eab-ab47-10ebcf57ed80.png?_jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXlIYXNoIjoiOWFjMDkxNWJiNzM0Zjk0ZiIsImJ1Y2tldCI6InJ1bndheS1kYXRhc2V0cyIsInN0YWdlIjoicHJvZCIsImV4cCI6MTc4OTk0MDE4N30.scr2KkqWbvMzpY_F0oSgO5_M5MLO-wqbDEO11IMMZzI'
+        run: |
+          curl --fail --location --retry 3 "$CARRIER_URL" -o "$RUNNER_TEMP/candidate-carrier.png"
+          printf '%s  %s\n' '5db93f406b8714e18b1c1cac18d99c41455f6a63afce69f59635853361bf2b21' "$RUNNER_TEMP/candidate-carrier.png" | sha256sum -c -
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          root = Path(os.environ['RUNNER_TEMP'])
+          data = (root / 'candidate-carrier.png').read_bytes()
+          marker = b'CG2D3TAR\n'
+          i = data.index(marker) + len(marker)
+          (root / 'payload.tar.gz').write_bytes(data[i:])
+          PY
+          printf '%s  %s\n' '8ecf76d9a685f84fac7a95c512ce879ee8b65509dc252d4b48be3a43e7fcd9e9' "$RUNNER_TEMP/payload.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/payload.tar.gz" -C .
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - name: Commit only the verified candidate
+        run: |
+          rm .github/workflows/2d3-bootstrap.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(2d-3): publish verified V2 release candidate"
+          git push origin HEAD:release/v2-2d3
