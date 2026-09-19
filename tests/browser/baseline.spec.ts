@@ -141,3 +141,38 @@ test("new game confirmation, install help, and fullscreen controls remain availa
   page.once("dialog", d => d.accept()); await page.locator('[data-new-game="confirm"]').click();
   await expect(page.locator("#reveal-turn")).toBeVisible(); expect((await state(page)).gameId).not.toBe(old.gameId);
 });
+
+
+test("end-turn face follows authoritative hot-seat handoff state", async ({ page }, info) => {
+  const s = fresh();
+  s.state.sharedDeck = [];
+  s.state.players.P1.discardPile = [];
+  s.state.players.P2.discardPile = [];
+  await seed(page, s);
+  await ready(page);
+
+  const button = page.locator("#end-turn");
+  const core = page.locator(".v2-turn-core");
+  await expect(button).toHaveAttribute("data-turn-state", "front-ready");
+  await expect(core).toHaveAttribute("data-turn-face", "front");
+  await expect(page.locator('[data-turn-face-panel="front"]')).toHaveCSS("visibility", "visible");
+  await expect(page.locator('[data-turn-face-panel="back"]')).toHaveCSS("visibility", "hidden");
+  await screenshot(page, info, "turn-front-ready");
+
+  await button.click();
+  await expect(page.locator("#reveal-turn")).toBeVisible();
+  await expect(button).toHaveAttribute("data-turn-state", "back-waiting");
+  await expect(button).toBeDisabled();
+  await expect(core).toHaveAttribute("data-turn-face", "back");
+  await expect(page.locator('[data-turn-face-panel="front"]')).toHaveCSS("visibility", "hidden");
+  await expect(page.locator('[data-turn-face-panel="back"]')).toHaveCSS("visibility", "visible");
+  await screenshot(page, info, "turn-back-waiting");
+
+  await page.locator("#reveal-turn").click();
+  await expect(button).toHaveAttribute("data-turn-state", "front-ready");
+  await expect(button).toBeEnabled();
+  await expect(core).toHaveAttribute("data-turn-face", "front");
+  await expect(page.locator('[data-turn-face-panel="front"]')).toHaveCSS("visibility", "visible");
+  await expect(page.locator('[data-turn-face-panel="back"]')).toHaveCSS("visibility", "hidden");
+  await screenshot(page, info, "turn-front-restored");
+});

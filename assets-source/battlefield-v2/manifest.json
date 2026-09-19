@@ -1,5 +1,5 @@
 {
-  "version": "v2-2c-9838ca6e8e0b",
+  "version": "v2-3a1-adcd3eb725ed",
   "design": [
     1152,
     648
@@ -388,25 +388,50 @@
       "derivativeOf": "card-back-final",
       "quadSourcePx": [
         [
-          88.0,
-          302.0
+          88,
+          302
         ],
         [
-          187.0,
-          306.0
+          187,
+          306
         ],
         [
-          170.0,
-          474.0
+          170,
+          474
         ],
         [
-          49.0,
-          467.0
+          49,
+          467
         ]
       ],
       "occludedBy": "deck-rim"
+    },
+    {
+      "id": "turn-core-back",
+      "file": "turn-core-back.webp",
+      "source": "2b-approved-asset-sheet",
+      "width": 196,
+      "height": 96,
+      "bytes": 5410,
+      "sha256": "adcd3eb725ed3c15c15d18eec873f0102c56b87d7b70ddecb6c5a76f72e365af",
+      "alpha": true,
+      "regionId": "B3",
+      "sourceRect": [
+        1360,
+        338,
+        158,
+        90
+      ],
+      "worldRect": [
+        985.263158,
+        264.401914,
+        135.043062,
+        66.143541
+      ],
+      "transport": "extra/turn-core-back.webp",
+      "note": "Approved Stage 2B B3 flip-back panel, isolated onto the existing 196x96 turn-core canvas. 3A-1 wires the asset only; no flip state or animation yet."
     }
   ],
-  "revision": "2d-0-local-art-fix",
-  "note": "2D-0: local empty-well crop from user-approved reference, explicitly registered; not a general presentation atlas. Master and official card unchanged. Hero silhouettes retraced without chroma-key holes."
+  "revision": "3a1-turn-flip-resource-wiring",
+  "note": "3A-1: approved B3 turn-core back face is checksum-registered and preloaded alongside the existing front/light/rim. Visual state remains front-only until 3A-2."
 }
