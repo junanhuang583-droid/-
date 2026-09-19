@@ -1,5 +1,5 @@
 import { battlefieldBackground, deckView, turnView, heroView } from "./battlefield-view.js";
-import { deriveTurnControlState } from "../application/turn-control-state.js";
+import { deriveTurnControlState, turnFace, type TurnControlFace } from "../application/turn-control-state.js";
 import { v2Asset } from "../application/battlefield-v2.js";
 import {
   canMinionAttack,
@@ -25,6 +25,8 @@ let pendingTurnDrawCount = 0;
 let hiddenDrawCount = 0;
 let openingDealActive = restoredSession === null;
 let animationRunning = false;
+let turnFlipAnimating = false;
+let turnFlipEpoch = 0;
 let notice = restoredSession
   ? "已恢复上次对局。新对局将启用扩展演示牌池。"
   : "新对局准备中：洗牌并发初始手牌。";
@@ -40,8 +42,13 @@ subscribeSession((reason) => {
     hiddenDrawCount = 0;
     openingDealActive = false;
     animationRunning = false;
+    turnFlipEpoch += 1;
+    turnFlipAnimating = false;
     notice = "已同步另一窗口中的对局。";
   }
+  // A committed end-turn/reveal renders through the flip presenter. Suppress
+  // the normal command render so it cannot replace the core mid-animation.
+  if (turnFlipAnimating && reason === "command") return;
   if (sessionRenderQueued) return;
   sessionRenderQueued = true;
   queueMicrotask(() => { sessionRenderQueued = false; render(); });
@@ -57,7 +64,7 @@ function render(): void {
   const active = state.activePlayer;
   const opponent = otherPlayer(active);
   const activeState = state.players[active];
-  const interactionLocked = openingDealActive || animationRunning;
+  const interactionLocked = openingDealActive || animationRunning || turnFlipAnimating;
 
   root.innerHTML = `
     <main class="game-shell ${session.handoffRequired ? "session-private" : ""} ${openingDealActive ? "opening-deal" : ""} ${hiddenDrawCount > 0 ? "draw-animating" : ""}">
@@ -139,7 +146,7 @@ function render(): void {
 
       <div id="flying-card-layer" class="flying-card-layer" aria-hidden="true"></div>
       ${openingDealActive ? openingDealOverlay() : ""}
-      ${!openingDealActive && session.handoffRequired && !state.winner ? handoffOverlay(active) : ""}
+      ${!openingDealActive && session.handoffRequired && !state.winner && !turnFlipAnimating ? handoffOverlay(active) : ""}
       ${!openingDealActive && state.winner ? winnerOverlay(state.winner) : ""}
     </main>
   `;
@@ -150,7 +157,7 @@ function render(): void {
 
 function heroPanel(playerId: PlayerId, isActive: boolean): string {
   const player = session.state.players[playerId];
-  const target = !isActive && selectedAttackerId !== null && !session.handoffRequired && !animationRunning;
+  const target = !isActive && selectedAttackerId !== null && !session.handoffRequired && !interactionBusy();
   return heroView(playerId, isActive, player.health, player.hand.length, target);
 }
 
@@ -162,7 +169,7 @@ function boardZone(playerId: PlayerId, isActivePanel: boolean): string {
     const visualOrder = minion ? occupiedOrder++ : null;
     return boardSlot(playerId, minion, index, isActivePanel, visualOrder, occupiedCount);
   }).join("");
-  const summonMode = isActivePanel && selectedHandIndex !== null && !session.handoffRequired && !animationRunning;
+  const summonMode = isActivePanel && selectedHandIndex !== null && !session.handoffRequired && !interactionBusy();
   return `
     <section class="board-zone ${isActivePanel ? "active-board" : "opponent-board"} ${summonMode ? "summon-mode" : ""}" data-battlefield-anchor="${isActivePanel ? "active-minions" : "opponent-minions"}">
       <div class="board-caption"><span>${isActivePanel ? "己方随从" : "敌方随从"}</span><small>5 格</small></div>
@@ -181,19 +188,19 @@ function boardSlot(
 ): string {
   const logicalOffset = slotIndex - 2;
   if (!minion) {
-    const summonReady = isActivePanel && selectedHandIndex !== null && !session.handoffRequired && !animationRunning;
-    return `<button class="board-slot empty-slot ${summonReady ? "summon-ready" : ""}" style="--battle-slot-index:${logicalOffset}" data-empty-slot="${slotIndex}" data-battlefield-slot="${playerId}-${slotIndex + 1}" ${isActivePanel && !animationRunning ? "" : "disabled"}><span>${slotIndex + 1}</span><small>${summonReady ? "召唤" : "空位"}</small></button>`;
+    const summonReady = isActivePanel && selectedHandIndex !== null && !session.handoffRequired && !interactionBusy();
+    return `<button class="board-slot empty-slot ${summonReady ? "summon-ready" : ""}" style="--battle-slot-index:${logicalOffset}" data-empty-slot="${slotIndex}" data-battlefield-slot="${playerId}-${slotIndex + 1}" ${isActivePanel && !interactionBusy() ? "" : "disabled"}><span>${slotIndex + 1}</span><small>${summonReady ? "召唤" : "空位"}</small></button>`;
   }
   const compactOffset = (visualOrder ?? 0) - (occupiedCount - 1) / 2;
   const card = catalog.cards.get(minion.cardId);
   const attack = Math.max(0, (card?.attack ?? 0) + minion.attackModifier);
-  const ready = playerId === session.state.activePlayer && canMinionAttack(session, minion) && !session.handoffRequired && !animationRunning;
+  const ready = playerId === session.state.activePlayer && canMinionAttack(session, minion) && !session.handoffRequired && !interactionBusy();
   const selected = selectedAttackerId === minion.instanceId;
-  const enemyTarget = playerId !== session.state.activePlayer && selectedAttackerId !== null && !session.handoffRequired && !animationRunning;
+  const enemyTarget = playerId !== session.state.activePlayer && selectedAttackerId !== null && !session.handoffRequired && !interactionBusy();
   return `
     <button class="board-slot minion ${ready ? "attack-ready" : ""} ${selected ? "selected" : ""} ${enemyTarget ? "enemy-target" : ""}"
       style="--battle-unit-index:${compactOffset};--battle-slot-index:${logicalOffset}"
-      data-minion-id="${escapeHtml(minion.instanceId)}" data-card-id="${escapeHtml(minion.cardId)}" data-owner="${playerId}" data-battlefield-slot="${playerId}-${slotIndex + 1}" ${animationRunning ? "disabled" : ""}>
+      data-minion-id="${escapeHtml(minion.instanceId)}" data-card-id="${escapeHtml(minion.cardId)}" data-owner="${playerId}" data-battlefield-slot="${playerId}-${slotIndex + 1}" ${interactionBusy() ? "disabled" : ""}>
       <span class="slot-number">${slotIndex + 1}</span>
       <div class="minion-art"><span>${escapeHtml((card?.name ?? minion.cardId).slice(0, 1))}</span></div>
       <strong>${escapeHtml(card?.name ?? minion.cardId)}</strong>
@@ -210,7 +217,7 @@ function handCard(cardId: CardId, index: number, handSize: number): string {
   const unusable = card.health === null || card.attack === null;
   const newlyDrawnHidden = hiddenDrawCount > 0 && index >= handSize - hiddenDrawCount;
   return `
-    <button class="hand-card ${selected ? "selected" : ""} ${newlyDrawnHidden ? "newly-drawn-hidden" : ""}" data-hand-index="${index}" data-card-id="${escapeHtml(cardId)}" ${unusable || animationRunning ? "disabled" : ""}>
+    <button class="hand-card ${selected ? "selected" : ""} ${newlyDrawnHidden ? "newly-drawn-hidden" : ""}" data-hand-index="${index}" data-card-id="${escapeHtml(cardId)}" ${unusable || interactionBusy() ? "disabled" : ""}>
       <span class="card-id">${escapeHtml(card.id)}</span>
       <div class="hand-card-art"><span>${escapeHtml(card.name.slice(0, 1))}</span></div>
       <strong>${escapeHtml(card.name)}</strong>
@@ -223,7 +230,7 @@ function handCard(cardId: CardId, index: number, handSize: number): string {
 function bindEvents(): void {
   document.querySelectorAll<HTMLElement>("[data-hand-index]").forEach((element) => {
     element.addEventListener("click", () => {
-      if (session.handoffRequired || animationRunning) return;
+      if (session.handoffRequired || interactionBusy()) return;
       const index = Number(element.dataset.handIndex);
       selectedHandIndex = selectedHandIndex === index ? null : index;
       selectedAttackerId = null;
@@ -234,7 +241,7 @@ function bindEvents(): void {
 
   document.querySelectorAll<HTMLElement>("[data-empty-slot]").forEach((element) => {
     element.addEventListener("click", () => {
-      if (selectedHandIndex === null || animationRunning) return;
+      if (selectedHandIndex === null || interactionBusy()) return;
       const error = dispatchGame({ type: "summon", handIndex: selectedHandIndex, slotIndex: Number(element.dataset.emptySlot), cardId: session.state.players[session.state.activePlayer].hand[selectedHandIndex]! });
       if (!error) selectedHandIndex = null;
       selectedAttackerId = null;
@@ -244,7 +251,7 @@ function bindEvents(): void {
 
   document.querySelectorAll<HTMLElement>("[data-minion-id]").forEach((element) => {
     element.addEventListener("click", () => {
-      if (session.handoffRequired || animationRunning) return;
+      if (session.handoffRequired || interactionBusy()) return;
       const instanceId = element.dataset.minionId;
       const owner = element.dataset.owner as PlayerId | undefined;
       if (!instanceId || !owner) return;
@@ -269,7 +276,7 @@ function bindEvents(): void {
   });
 
   document.querySelector<HTMLElement>("[data-hero-target]")?.addEventListener("click", () => {
-    if (!selectedAttackerId || animationRunning) return;
+    if (!selectedAttackerId || interactionBusy()) return;
     const error = dispatchGame({ type: "attack-hero", attackerId: selectedAttackerId });
     selectedAttackerId = null;
     selectedHandIndex = null;
@@ -277,35 +284,16 @@ function bindEvents(): void {
   });
 
   document.querySelector<HTMLButtonElement>("#end-turn")?.addEventListener("click", () => {
-    if (animationRunning) return;
-    const next = otherPlayer(session.state.activePlayer);
-    const handBefore = session.state.players[next].hand.length;
-    const error = dispatchGame({ type: "end-turn" });
-    session = readSession();
-    if (!error) {
-      pendingTurnDrawCount = Math.max(0, session.state.players[next].hand.length - handBefore);
-    }
-    selectedAttackerId = null;
-    selectedHandIndex = null;
-    commit(error ?? "回合结束，进入交接。", Boolean(error));
+    void endTurnWithFlip();
   });
 
   document.querySelector<HTMLButtonElement>("#reveal-turn")?.addEventListener("click", () => {
-    if (animationRunning) return;
-    dispatchGame({ type: "reveal-turn" });
-    session = readSession();
-    const drawCount = pendingTurnDrawCount;
-    pendingTurnDrawCount = 0;
-    hiddenDrawCount = drawCount;
-    notice = `${playerLabel(session.state.activePlayer)}已接手。`;
-
-    render();
-    if (drawCount > 0) void playTurnDraw(drawCount);
+    void revealTurnWithFlip();
   });
 
   document.querySelectorAll<HTMLElement>("[data-new-game]").forEach((element) => {
     element.addEventListener("click", () => {
-      if (animationRunning) return;
+      if (interactionBusy()) return;
       const needsConfirm = element.dataset.newGame !== "instant";
       if (needsConfirm && !window.confirm("这会覆盖当前保存的对局。确定新开一局吗？")) return;
       startNewGame();
@@ -313,8 +301,160 @@ function bindEvents(): void {
   });
 }
 
+async function endTurnWithFlip(): Promise<void> {
+  if (interactionBusy()) return;
+  const button = document.querySelector<HTMLButtonElement>("#end-turn");
+  if (!button || button.disabled) return;
+
+  const fromFace = currentPresentedTurnFace();
+  turnFlipAnimating = true;
+  const flipEpoch = ++turnFlipEpoch;
+  const next = otherPlayer(session.state.activePlayer);
+  const handBefore = session.state.players[next].hand.length;
+  const error = dispatchGame({ type: "end-turn" });
+  session = readSession();
+
+  if (error) {
+    turnFlipAnimating = false;
+    commit(error, true);
+    return;
+  }
+
+  pendingTurnDrawCount = Math.max(0, session.state.players[next].hand.length - handBefore);
+  selectedAttackerId = null;
+  selectedHandIndex = null;
+  notice = "回合结束，进入交接。";
+  const toFace = authoritativeTurnFace();
+  render();
+  await playTurnFlip(fromFace, toFace, flipEpoch);
+}
+
+async function revealTurnWithFlip(): Promise<void> {
+  if (interactionBusy()) return;
+  const reveal = document.querySelector<HTMLButtonElement>("#reveal-turn");
+  if (!reveal || reveal.disabled) return;
+
+  const fromFace = currentPresentedTurnFace();
+  turnFlipAnimating = true;
+  const flipEpoch = ++turnFlipEpoch;
+  const error = dispatchGame({ type: "reveal-turn" });
+  session = readSession();
+
+  if (error) {
+    turnFlipAnimating = false;
+    commit(error, true);
+    return;
+  }
+
+  const drawCount = pendingTurnDrawCount;
+  pendingTurnDrawCount = 0;
+  hiddenDrawCount = drawCount;
+  notice = `${playerLabel(session.state.activePlayer)}已接手。`;
+  const toFace = authoritativeTurnFace();
+  render();
+  await playTurnFlip(fromFace, toFace, flipEpoch);
+  if (flipEpoch !== turnFlipEpoch) return;
+  if (drawCount > 0) void playTurnDraw(drawCount);
+}
+
+async function playTurnFlip(fromFace: TurnControlFace, toFace: TurnControlFace, epoch: number): Promise<void> {
+  const core = document.querySelector<HTMLElement>(".v2-turn-core");
+  const button = document.querySelector<HTMLButtonElement>("#end-turn");
+  if (!core || !button || epoch !== turnFlipEpoch) {
+    finishTurnFlip(epoch);
+    return;
+  }
+
+  button.dataset.turnFlipping = "true";
+  button.setAttribute("aria-busy", "true");
+  // render() already reflects the committed target state. Restore the old face
+  // synchronously before paint, then animate only the movable core toward it.
+  setTurnCoreFace(core, fromFace);
+
+  if (fromFace === toFace) {
+    finishTurnFlip(epoch);
+    return;
+  }
+
+  if (reducedMotion()) {
+    setTurnCoreFace(core, toFace);
+    try {
+      await core.animate([{ opacity: 0.72 }, { opacity: 1 }], {
+        duration: 70,
+        easing: "ease-out",
+      }).finished;
+    } catch {
+      // Cosmetic motion can be cancelled by navigation or a newer render.
+    }
+    finishTurnFlip(epoch);
+    return;
+  }
+
+  try {
+    const flipOut = core.animate([
+      { transform: "translateY(0) rotateX(0deg) scale(1)", filter: "brightness(1)" },
+      { transform: "translateY(1.378px) rotateX(0deg) scale(.985)", filter: "brightness(.92)", offset: 0.22 },
+      { transform: "translateY(0) rotateX(90deg) scale(.99)", filter: "brightness(.84)" },
+    ], {
+      duration: 145,
+      easing: "cubic-bezier(.4,0,.72,1)",
+      fill: "forwards",
+    });
+    await flipOut.finished;
+    if (epoch !== turnFlipEpoch) return;
+
+    setTurnCoreFace(core, toFace);
+    const flipIn = core.animate([
+      { transform: "translateY(0) rotateX(-90deg) scale(.99)", filter: "brightness(.84)" },
+      { transform: "translateY(0) rotateX(0deg) scale(1)", filter: "brightness(1)" },
+    ], {
+      duration: 135,
+      easing: "cubic-bezier(.2,.72,.24,1)",
+      fill: "forwards",
+    });
+    await flipIn.finished;
+  } catch {
+    // The command is already authoritative. Cancellation must converge to the
+    // saved face; it can never roll back or delay the real turn transition.
+    if (epoch === turnFlipEpoch) setTurnCoreFace(core, toFace);
+  }
+
+  finishTurnFlip(epoch);
+}
+
+function setTurnCoreFace(core: HTMLElement, face: TurnControlFace): void {
+  core.dataset.turnFace = face;
+  const front = core.querySelector<HTMLElement>('[data-turn-face-panel="front"]');
+  const back = core.querySelector<HTMLElement>('[data-turn-face-panel="back"]');
+  front?.setAttribute("aria-hidden", String(face !== "front"));
+  back?.setAttribute("aria-hidden", String(face !== "back"));
+}
+
+function finishTurnFlip(epoch: number): void {
+  if (epoch !== turnFlipEpoch) return;
+  turnFlipAnimating = false;
+  render();
+}
+
+function currentPresentedTurnFace(): TurnControlFace {
+  return document.querySelector<HTMLElement>(".v2-turn-core")?.dataset.turnFace === "back" ? "back" : "front";
+}
+
+function authoritativeTurnFace(): TurnControlFace {
+  return turnFace(deriveTurnControlState({
+    handoffRequired: session.handoffRequired,
+    blocked: Boolean(session.state.winner || openingDealActive || animationRunning || hasPendingEffects(session)),
+  }));
+}
+
+function interactionBusy(): boolean {
+  return animationRunning || turnFlipAnimating;
+}
+
 function startNewGame(): void {
   animationEpoch += 1;
+  turnFlipEpoch += 1;
+  turnFlipAnimating = false;
   resetGame();
   session = readSession();
   selectedAttackerId = null;
