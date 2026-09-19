@@ -42,3 +42,59 @@ export function fixedRect(r: Rect): string {
   return `left:${r.x}px;top:${r.y}px;width:${r.width}px;height:${r.height}px`;
 }
 export const v2Asset = (name: string): string => `./assets/battlefield-v2/${assetManifest.version}/${name}.webp`;
+
+/** R1 solid registration, in the existing authored world plane. Both textures
+ * stay on one unchanged core. The B3 sprite window removes margins, not artwork. */
+export const TURN_PLATE = {
+  depth: 3,
+  // Pixel windows, measured against the approved native textures. They remove
+  // only transparent padding; the raw assets and transport hashes stay intact.
+  crops: { front: { x: 0, y: 0, width: 196, height: 96 },
+    back: { x: 21, y: 11, width: 156, height: 76 } },
+  pivot: { x: .5, y: .5 },
+  // The cut corners follow the front's structural perimeter, not its shadows.
+  outline: [[38, 0], [161, 0], [196, 24], [196, 72],
+    [162, 96], [36, 96], [0, 72], [0, 24]],
+  sourceSize: { width: 196, height: 96 },
+} as const;
+
+export function turnPlateStyle(): string {
+  return `--turn-plate-depth:${TURN_PLATE.depth}px;--turn-plate-half-depth:${TURN_PLATE.depth / 2}px`;
+}
+
+/** A uniform contain fit preserves the approved emblem's aspect ratio. */
+export function turnFaceRect(face: 'front' | 'back'): Rect {
+  const id = face === 'front' ? 'turn-core-front-neutral' : 'turn-core-back';
+  const asset = assetManifest.assets.find(entry => entry.id === id);
+  if (!asset || asset.width <= 0 || asset.height <= 0) throw new Error(`Invalid turn face: ${id}`);
+  const crop = TURN_PLATE.crops[face];
+  if (crop.x + crop.width > asset.width || crop.y + crop.height > asset.height)
+    throw new Error(`Turn crop exceeds texture: ${id}`);
+  const scale = Math.min(V2.core.width / crop.width, V2.core.height / crop.height);
+  const width = crop.width * scale, height = crop.height * scale;
+  return { x: V2.core.x + (V2.core.width - width) / 2,
+    y: V2.core.y + (V2.core.height - height) / 2, width, height };
+}
+
+/** Eight narrow edge planes, not a second painted housing. At rest the front
+ * surface is at z=0; the slab extends into the socket, never towards the rim. */
+export function turnPlateEdges(): string[] {
+  const points = TURN_PLATE.outline.map(([x, y]) => ({
+    x: x / TURN_PLATE.sourceSize.width * V2.core.width,
+    y: y / TURN_PLATE.sourceSize.height * V2.core.height,
+  }));
+  return points.map((point, index) => {
+    const next = points[(index + 1) % points.length]!;
+    const dx = next.x - point.x, dy = next.y - point.y;
+    return `left:${point.x}px;top:${point.y}px;width:${Math.hypot(dx, dy)}px;--edge-angle:${Math.atan2(dy, dx) * 180 / Math.PI}deg`;
+  });
+}
+
+/** Clip only the texture child, never the plate/3D transform owner. */
+export function turnTextureStyle(face: 'front' | 'back'): string {
+  return relativeRect(turnFaceRect(face), V2.core);
+}
+export function turnTextureImageStyle(face: 'front' | 'back'): string {
+  const crop = TURN_PLATE.crops[face];
+  return relativeRect({ x: 0, y: 0, ...TURN_PLATE.sourceSize }, crop);
+}
