@@ -2,7 +2,7 @@ import { v2Asset } from '../application/battlefield-v2.js';
 import { onViewRendered } from './view-events.js';
 
 const decoded = new Set<string>();
-const required = ['turn-core-front-neutral','turn-core-light'] as const;
+const required = ['turn-core-front-neutral','turn-core-light','turn-core-back'] as const;
 for (const name of required) {
   const probe = new Image();
   probe.onload = () => { if (probe.naturalWidth > 0) decoded.add(name); sync(); };
@@ -15,5 +15,6 @@ function sync(): void {
   if (!button) return;
   button.classList.toggle('end-turn-art-ready',required.every(name => decoded.has(name)));
   // Text always remains live/readable, including load failure and disabled state.
-  // Only the core animates. The true button and retaining brackets stay fixed.
+  // 3A-2 derives the visible front/back face from the authoritative session render.
+  // This loader only gates artwork readiness; it never owns game or handoff state.
 }

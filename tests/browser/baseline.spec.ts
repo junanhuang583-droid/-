@@ -141,3 +141,253 @@ test("new game confirmation, install help, and fullscreen controls remain availa
   page.once("dialog", d => d.accept()); await page.locator('[data-new-game="confirm"]').click();
   await expect(page.locator("#reveal-turn")).toBeVisible(); expect((await state(page)).gameId).not.toBe(old.gameId);
 });
+
+
+test("end-turn face follows authoritative hot-seat handoff state", async ({ page }, info) => {
+  const s = fresh();
+  s.state.sharedDeck = [];
+  s.state.players.P1.discardPile = [];
+  s.state.players.P2.discardPile = [];
+  await seed(page, s);
+  await ready(page);
+
+  const button = page.locator("#end-turn");
+  const core = page.locator(".v2-turn-core");
+  await expect(button).toHaveAttribute("data-turn-state", "front-ready");
+  await expect(core).toHaveAttribute("data-turn-face", "front");
+  await expect(page.locator('[data-turn-face-panel="front"]')).toHaveCSS("visibility", "visible");
+  await expect(page.locator('[data-turn-face-panel="back"]')).toHaveCSS("visibility", "hidden");
+  await screenshot(page, info, "turn-front-ready");
+
+  await button.click();
+  await expect(page.locator("#reveal-turn")).toBeVisible();
+  await expect(button).toHaveAttribute("data-turn-state", "back-waiting");
+  await expect(button).toBeDisabled();
+  await expect(core).toHaveAttribute("data-turn-face", "back");
+  await expect(page.locator('[data-turn-face-panel="front"]')).toHaveCSS("visibility", "hidden");
+  await expect(page.locator('[data-turn-face-panel="back"]')).toHaveCSS("visibility", "visible");
+  await screenshot(page, info, "turn-back-waiting");
+
+  await page.locator("#reveal-turn").click();
+  await expect(button).toHaveAttribute("data-turn-state", "front-ready");
+  await expect(button).toBeEnabled();
+  await expect(core).toHaveAttribute("data-turn-face", "front");
+  await expect(page.locator('[data-turn-face-panel="front"]')).toHaveCSS("visibility", "visible");
+  await expect(page.locator('[data-turn-face-panel="back"]')).toHaveCSS("visibility", "hidden");
+  await screenshot(page, info, "turn-front-restored");
+});
+
+
+test("3A-3 guards rapid end-turn and reveal re-entry", async ({ page }) => {
+  const s = fresh();
+  s.state.sharedDeck = [];
+  s.state.players.P1.discardPile = [];
+  s.state.players.P2.discardPile = [];
+  await seed(page, s);
+  await ready(page);
+
+  const beforeEnd = await state(page);
+  await page.locator("#end-turn").evaluate((element) => {
+    const button = element as HTMLButtonElement;
+    button.click();
+    button.click();
+  });
+  await expect(page.locator("#reveal-turn")).toBeVisible();
+  const afterEnd = await state(page);
+  expect(afterEnd.state.turn).toBe(beforeEnd.state.turn + 1);
+  expect(afterEnd.revision).toBe((beforeEnd.revision ?? 0) + 1);
+
+  const beforeReveal = await state(page);
+  await page.locator("#reveal-turn").evaluate((element) => {
+    const button = element as HTMLButtonElement;
+    button.click();
+    button.click();
+  });
+  await expect(page.locator("#end-turn")).toHaveAttribute("data-turn-state", "front-ready");
+  const afterReveal = await state(page);
+  expect(afterReveal.state.turn).toBe(beforeReveal.state.turn);
+  expect(afterReveal.revision).toBe((beforeReveal.revision ?? 0) + 1);
+});
+
+test("3A-3 keyboard activation uses the same guarded turn path", async ({ page }) => {
+  const s = fresh();
+  s.state.sharedDeck = [];
+  s.state.players.P1.discardPile = [];
+  s.state.players.P2.discardPile = [];
+  await seed(page, s);
+  await ready(page);
+  const before = await state(page);
+
+  await page.locator("#end-turn").focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#reveal-turn")).toBeVisible();
+  await page.locator("#reveal-turn").click();
+  await expect(page.locator("#end-turn")).toHaveAttribute("data-turn-state", "front-ready");
+
+  await page.locator("#end-turn").focus();
+  await page.keyboard.press("Space");
+  await expect(page.locator("#reveal-turn")).toBeVisible();
+  const after = await state(page);
+  expect(after.state.turn).toBe(before.state.turn + 2);
+});
+
+
+for (const [width, height] of [[1536, 691], [740, 360]] as const) {
+  test(`3A-4 normal-motion turn core flips while rim stays fixed ${width}x${height}`, async ({ page }, info) => {
+    await page.setViewportSize({ width, height });
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    const s = fresh();
+    s.state.sharedDeck = [];
+    s.state.players.P1.discardPile = [];
+    s.state.players.P2.discardPile = [];
+    await seed(page, s);
+    await ready(page);
+
+    const button = page.locator("#end-turn");
+    const core = page.locator(".v2-turn-core");
+    const rim = page.locator(".v2-turn-rim");
+    const before = await state(page);
+    const rimBefore = await rim.boundingBox();
+    const buttonBefore = await button.boundingBox();
+    expect(rimBefore && buttonBefore).toBeTruthy();
+
+    const hitbox = await button.boundingBox();
+    expect(hitbox).toBeTruthy();
+    await page.mouse.move(hitbox!.x + hitbox!.width / 2, hitbox!.y + hitbox!.height / 2);
+    await page.mouse.down();
+    await page.waitForTimeout(35);
+    const pressedTransform = await core.evaluate((element) => getComputedStyle(element).transform);
+    expect(pressedTransform).not.toBe("none");
+    await page.mouse.up();
+
+    await expect(button).toHaveAttribute("data-turn-flipping", "true");
+    expect((await state(page)).state.turn).toBe(before.state.turn + 1);
+    expect((await state(page)).handoffRequired).toBe(true);
+
+    await expect.poll(() => core.evaluate((element) => element.getAnimations().length)).toBeGreaterThan(0);
+    const outgoingTransform = await core.evaluate((element) => {
+      const animation = element.getAnimations()[0];
+      if (!animation) return "none";
+      animation.pause();
+      const duration = animation.effect?.getTiming().duration;
+      animation.currentTime = typeof duration === "number" ? duration * 0.55 : 70;
+      return getComputedStyle(element).transform;
+    });
+    expect(outgoingTransform).not.toBe("none");
+    expect(outgoingTransform).not.toBe("matrix(1, 0, 0, 1, 0, 0)");
+
+    const rimDuring = await rim.boundingBox();
+    const buttonDuring = await button.boundingBox();
+    expect(rimDuring && buttonDuring).toBeTruthy();
+    close(rimDuring!.x, rimBefore!.x);
+    close(rimDuring!.y, rimBefore!.y);
+    close(rimDuring!.width, rimBefore!.width);
+    close(rimDuring!.height, rimBefore!.height);
+    close(buttonDuring!.x, buttonBefore!.x);
+    close(buttonDuring!.y, buttonBefore!.y);
+    close(buttonDuring!.width, buttonBefore!.width);
+    close(buttonDuring!.height, buttonBefore!.height);
+    await core.evaluate((element) => element.getAnimations().forEach((animation) => animation.play()));
+
+    await expect(page.locator("#reveal-turn")).toBeVisible();
+    await expect(button).toHaveAttribute("data-turn-state", "back-waiting");
+    await expect(core).toHaveAttribute("data-turn-face", "back");
+    const afterEnd = await state(page);
+    expect(afterEnd.state.turn).toBe(before.state.turn + 1);
+    expect(afterEnd.handoffRequired).toBe(true);
+
+    const rimBeforeReveal = await rim.boundingBox();
+    expect(rimBeforeReveal).toBeTruthy();
+    await page.locator("#reveal-turn").evaluate((element) => (element as HTMLButtonElement).click());
+    await expect(button).toHaveAttribute("data-turn-flipping", "true");
+    await expect.poll(() => core.evaluate((element) => element.getAnimations().length)).toBeGreaterThan(0);
+    const incomingTransform = await core.evaluate((element) => {
+      const animation = element.getAnimations()[0];
+      if (!animation) return "none";
+      animation.pause();
+      const duration = animation.effect?.getTiming().duration;
+      animation.currentTime = typeof duration === "number" ? duration * 0.55 : 70;
+      return getComputedStyle(element).transform;
+    });
+    expect(incomingTransform).not.toBe("none");
+    expect(incomingTransform).not.toBe("matrix(1, 0, 0, 1, 0, 0)");
+    const rimDuringReveal = await rim.boundingBox();
+    expect(rimDuringReveal).toBeTruthy();
+    close(rimDuringReveal!.x, rimBeforeReveal!.x);
+    close(rimDuringReveal!.y, rimBeforeReveal!.y);
+    close(rimDuringReveal!.width, rimBeforeReveal!.width);
+    close(rimDuringReveal!.height, rimBeforeReveal!.height);
+    await core.evaluate((element) => element.getAnimations().forEach((animation) => animation.play()));
+
+    await expect(button).toHaveAttribute("data-turn-state", "front-ready");
+    await expect(button).toBeEnabled();
+    await expect(core).toHaveAttribute("data-turn-face", "front");
+    const afterReveal = await state(page);
+    expect(afterReveal.state.turn).toBe(afterEnd.state.turn);
+    expect(afterReveal.handoffRequired).toBe(false);
+    await screenshot(page, info, `3a4-normal-motion-${width}x${height}`);
+  });
+}
+
+test("3A-4 reload during either flip converges to the authoritative saved face", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const s = fresh();
+  s.state.sharedDeck = [];
+  s.state.players.P1.discardPile = [];
+  s.state.players.P2.discardPile = [];
+  await seed(page, s);
+  await ready(page);
+  const before = await state(page);
+
+  await page.locator("#end-turn").evaluate((element) => (element as HTMLButtonElement).click());
+  await expect(page.locator("#end-turn")).toHaveAttribute("data-turn-flipping", "true");
+  await page.waitForTimeout(45);
+  const committedHandoff = await state(page);
+  expect(committedHandoff.state.turn).toBe(before.state.turn + 1);
+  expect(committedHandoff.handoffRequired).toBe(true);
+
+  await page.reload();
+  await expect(page.locator("#end-turn")).toHaveAttribute("data-turn-state", "back-waiting");
+  await expect(page.locator(".v2-turn-core")).toHaveAttribute("data-turn-face", "back");
+  await expect(page.locator("#reveal-turn")).toBeVisible();
+  expect((await state(page)).state.turn).toBe(committedHandoff.state.turn);
+  expect((await state(page)).handoffRequired).toBe(true);
+
+  await page.locator("#reveal-turn").evaluate((element) => (element as HTMLButtonElement).click());
+  await expect(page.locator("#end-turn")).toHaveAttribute("data-turn-flipping", "true");
+  await page.waitForTimeout(45);
+  const committedReveal = await state(page);
+  expect(committedReveal.state.turn).toBe(committedHandoff.state.turn);
+  expect(committedReveal.handoffRequired).toBe(false);
+
+  await page.reload();
+  await expect(page.locator("#end-turn")).toHaveAttribute("data-turn-state", "front-ready");
+  await expect(page.locator(".v2-turn-core")).toHaveAttribute("data-turn-face", "front");
+  await expect(page.locator("#reveal-turn")).toHaveCount(0);
+  expect((await state(page)).state.turn).toBe(committedReveal.state.turn);
+  expect((await state(page)).handoffRequired).toBe(false);
+});
+
+test("3A-4 reduced motion switches face without a 3D core transform", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const s = fresh();
+  s.state.sharedDeck = [];
+  s.state.players.P1.discardPile = [];
+  s.state.players.P2.discardPile = [];
+  await seed(page, s);
+  await ready(page);
+
+  await page.locator("#end-turn").evaluate((element) => (element as HTMLButtonElement).click());
+  await expect(page.locator("#end-turn")).toHaveAttribute("data-turn-flipping", "true");
+  await page.waitForTimeout(20);
+  expect(await page.locator(".v2-turn-core").evaluate((element) => getComputedStyle(element).transform)).toBe("none");
+  await expect(page.locator("#reveal-turn")).toBeVisible();
+  await expect(page.locator(".v2-turn-core")).toHaveAttribute("data-turn-face", "back");
+
+  await page.locator("#reveal-turn").evaluate((element) => (element as HTMLButtonElement).click());
+  await expect(page.locator("#end-turn")).toHaveAttribute("data-turn-flipping", "true");
+  await page.waitForTimeout(20);
+  expect(await page.locator(".v2-turn-core").evaluate((element) => getComputedStyle(element).transform)).toBe("none");
+  await expect(page.locator("#end-turn")).toHaveAttribute("data-turn-state", "front-ready");
+  await expect(page.locator(".v2-turn-core")).toHaveAttribute("data-turn-face", "front");
+});
