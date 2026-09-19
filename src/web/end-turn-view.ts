@@ -15,6 +15,6 @@ function sync(): void {
   if (!button) return;
   button.classList.toggle('end-turn-art-ready',required.every(name => decoded.has(name)));
   // Text always remains live/readable, including load failure and disabled state.
-  // 3A-1 only proves all three core assets are available. The back face stays hidden
-  // until the dedicated state/motion pass; the true button and retaining brackets stay fixed.
+  // 3A-2 derives the visible front/back face from the authoritative session render.
+  // This loader only gates artwork readiness; it never owns game or handoff state.
 }

@@ -1,4 +1,5 @@
 import { battlefieldBackground, deckView, turnView, heroView } from "./battlefield-view.js";
+import { deriveTurnControlState } from "../application/turn-control-state.js";
 import { v2Asset } from "../application/battlefield-v2.js";
 import {
   canMinionAttack,
@@ -98,7 +99,10 @@ function render(): void {
 
         <aside class="battle-rail" data-battlefield-anchor="right-rail">
           ${deckView(state.sharedDeck.length)}
-          ${turnView(Boolean(state.winner || interactionLocked || session.handoffRequired || hasPendingEffects(session)))}
+          ${turnView(deriveTurnControlState({
+            handoffRequired: session.handoffRequired,
+            blocked: Boolean(state.winner || interactionLocked || hasPendingEffects(session)),
+          }))}
         </aside>
       </section>
 

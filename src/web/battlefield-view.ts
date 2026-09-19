@@ -1,5 +1,6 @@
 import { V2, deckSlices, relativeRect, sourceRect, fixedRect, v2Asset } from '../application/battlefield-v2.js';
 import type { PlayerId } from '../model/state.js';
+import { turnControlAriaLabel, turnControlDisabled, turnFace, type TurnControlState } from '../application/turn-control-state.js';
 
 const img = (asset: string, className: string, style = '') =>
   `<img class="${className}" src="${v2Asset(asset)}" alt="" aria-hidden="true" draggable="false" style="${style}" />`;
@@ -18,16 +19,21 @@ export function deckView(count: number): string {
     <strong class="v2-deck-count" data-deck-count="${count}" style="${relativeRect(V2.count,V2.deck)};font-size:${countFont}px">${count}</strong>
   </div>`;
 }
-export function turnView(disabled: boolean): string {
-  return `<div class="v2-turn" data-battlefield-anchor="turn-actions" style="${fixedRect(V2.turnInput)}">
-    <button id="end-turn" type="button" aria-label="结束回合" ${disabled?'disabled':''}>
-      <span class="v2-turn-core" data-flip-axis="x" data-turn-face="front" style="${relativeRect(V2.core,V2.turnInput)}">
-        <span class="v2-turn-face v2-turn-face-front" data-turn-face-panel="front">
+export function turnView(state: TurnControlState): string {
+  const face = turnFace(state);
+  const disabled = turnControlDisabled(state);
+  const frontHidden = face !== "front";
+  const backHidden = face !== "back";
+  return `<div class="v2-turn" data-battlefield-anchor="turn-actions" data-turn-state="${state}" style="${fixedRect(V2.turnInput)}">
+    <button id="end-turn" type="button" data-turn-state="${state}" aria-label="${turnControlAriaLabel(state)}" ${disabled?'disabled':''}>
+      <span class="v2-turn-core" data-flip-axis="x" data-turn-face="${face}" style="${relativeRect(V2.core,V2.turnInput)}">
+        <span class="v2-turn-face v2-turn-face-front" data-turn-face-panel="front" aria-hidden="${frontHidden}">
           ${img('turn-core-front-neutral','v2-turn-neutral')}${img('turn-core-light','v2-turn-light')}
           <span class="end-turn-label">结束回合</span>
         </span>
-        <span class="v2-turn-face v2-turn-face-back" data-turn-face-panel="back" aria-hidden="true">
+        <span class="v2-turn-face v2-turn-face-back" data-turn-face-panel="back" aria-hidden="${backHidden}">
           ${img('turn-core-back','v2-turn-back')}
+          <span class="end-turn-back-fallback">等待接手</span>
         </span>
       </span>
     </button>

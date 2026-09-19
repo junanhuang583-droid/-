@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { V2, V2_ANCHORS, MASTER_TO_WORLD, deckSlices, relativeRect, sourceRect, v2Asset } from '../src/application/battlefield-v2.js';
 import { deckView, heroView, turnView } from '../src/web/battlefield-view.js';
+import { deriveTurnControlState, turnControlDisabled, turnFace } from '../src/application/turn-control-state.js';
 
 describe('V2 presentation registration, not another rule engine', () => {
   it('normalizes the approved master by one uniform scale', () => {
@@ -48,15 +49,30 @@ describe('V2 presentation registration, not another rule engine', () => {
     expect(opponent).toContain('hero-opponent-frame');
     expect(active+opponent).not.toContain('hero-skill');
   });
-  it('retains a real disabled button and visible text fallback with a fixed sibling rim', () => {
-    const html=turnView(true);
-    expect(html).toContain('id="end-turn" type="button" aria-label="结束回合" disabled');
-    expect(html).toContain('class="end-turn-label">结束回合</span>');
-    expect(html).toContain('data-turn-face-panel="front"');
-    expect(html).toContain('data-turn-face-panel="back"');
-    expect(html).toContain('turn-core-back');
-    expect(html.indexOf('class="v2-turn-rim"')).toBeGreaterThan(html.indexOf('</button>'));
-    expect(html).not.toContain('end-turn-device');
+  it('derives turn control state from authoritative handoff before temporary locks', () => {
+    expect(deriveTurnControlState({ handoffRequired:false, blocked:false })).toBe('front-ready');
+    expect(deriveTurnControlState({ handoffRequired:false, blocked:true })).toBe('front-disabled');
+    expect(deriveTurnControlState({ handoffRequired:true, blocked:false })).toBe('back-waiting');
+    expect(deriveTurnControlState({ handoffRequired:true, blocked:true })).toBe('back-waiting');
+    expect(turnFace('back-waiting')).toBe('back');
+    expect(turnControlDisabled('front-ready')).toBe(false);
+    expect(turnControlDisabled('back-waiting')).toBe(true);
+  });
+  it('renders ready, blocked and handoff states without moving the fixed sibling rim', () => {
+    const ready=turnView('front-ready');
+    const blocked=turnView('front-disabled');
+    const handoff=turnView('back-waiting');
+    expect(ready).toContain('data-turn-state="front-ready"');
+    expect(ready).toContain('data-turn-face="front"');
+    expect(ready).not.toContain('aria-label="结束回合" disabled');
+    expect(blocked).toContain('data-turn-state="front-disabled"');
+    expect(blocked).toContain('aria-label="结束回合" disabled');
+    expect(handoff).toContain('data-turn-state="back-waiting"');
+    expect(handoff).toContain('data-turn-face="back"');
+    expect(handoff).toContain('aria-label="等待下一位玩家接手" disabled');
+    expect(handoff).toContain('turn-core-back');
+    expect(handoff.indexOf('class="v2-turn-rim"')).toBeGreaterThan(handoff.indexOf('</button>'));
+    expect(handoff).not.toContain('end-turn-device');
   });
   it('provides versioned transport URLs and stable relative registrations', () => {
     expect(v2Asset('card-back-final')).toMatch(/^\.\/assets\/battlefield-v2\/v2-3a1-[a-f0-9]{12}\/card-back-final\.webp$/);
