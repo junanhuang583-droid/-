@@ -22,6 +22,20 @@
 
 ## Scope and stop
 
-Current authorization is R0 + R1 only. R2 motion/lighting, R3 handoff flow, R4 final acceptance and R5 publication are separate work packages. Existing rule/state/command ownership must not change.
+Current authorization extends through R2 only. R3 handoff flow, R4 final acceptance and R5 publication remain separate work packages. Existing rule/state/command ownership must not change.
 
 The user does not need intermediate bundles or file deliveries, and will inspect the actual result after R5. Internal visual and regression checks still apply at each step. Do not merge or publish this branch before the repair is complete.
+
+
+## R2: continuous motion and surface lighting
+
+- Replaced the two-part outer-carrier flip with one physical plate rotation, 0 to 180 and 180 to 0. Both mounted textures and eight side planes remain on the same body. There is no image swap at the side pose.
+- The carrier now only presses/seats in depth. A held pointer/Space press is sampled before the command; its depth continues into the rotation, rather than resetting/replaying. A cancelled outside release does not submit a rule command.
+- Nominal outgoing duration is 380 ms (up to 60 take-up, 250 rotation, 70 seating); an already held press consumes no duplicate take-up and uses 320 ms. Reveal uses 320 ms without repeating the outgoing press.
+- All motion and lighting tracks use the same timeline. Only surface children receive shade/sheen/opacity. The physical carrier and plate stay unfiltered, fully opaque and unclipped throughout rotation.
+- Button disabled state no longer abruptly extinguishes the outgoing amber or changes the lettering color. The outgoing surface keeps its glow until facing away. The returning surface reaches its real ready/blocked brightness continuously; real draw locks remain respected, then readiness fades in over 120 ms.
+- Artwork readiness is applied synchronously on render to avoid a one-frame fallback flash. Only optical pose/light crosses existing view renders; full stable mounting, board orientation and handoff UI redesign are still R3 work.
+- Cancelled animations, hidden pages and reduced-motion changes discard only cosmetic work. Old node generations cannot complete against a newer view. No motion state enters saves. No rules, card values, image bytes, asset manifests, dependency versions or deployment workflows were changed.
+- Updated implementation-coupled legacy tests to sample the named plate rotation rather than whichever carrier animation is returned first. Added pure trajectory checks and full-game optical, native press, cancellation, preference-change, real draw-lock and ten-turn unmodified playback checks.
+- Local development checks use an offline full-application preview with asset URLs/in-memory storage adapted because this runtime cannot install npm packages or open local HTTP. They are preparatory only. Final locked-dependency production CI and its full-game screenshots must be reviewed before reporting R2 complete.
+- No intermediate packages are delivered to the user. Main and Pages remain on the released baseline. Stop before R3.

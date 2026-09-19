@@ -1,5 +1,8 @@
 import { battlefieldBackground, deckView, turnView, heroView } from "./battlefield-view.js";
-import { deriveTurnControlState, turnFace, type TurnControlFace } from "../application/turn-control-state.js";
+import { deriveTurnControlState } from "../application/turn-control-state.js";
+import { EndTurnMotion } from "./end-turn-motion.js";
+import { syncEndTurnArt } from "./end-turn-view.js";
+import type { TurnPose } from "../application/turn-motion.js";
 import { v2Asset } from "../application/battlefield-v2.js";
 import {
   canMinionAttack,
@@ -27,6 +30,7 @@ let openingDealActive = restoredSession === null;
 let animationRunning = false;
 let turnFlipAnimating = false;
 let turnFlipEpoch = 0;
+const turnMotion = new EndTurnMotion();
 let notice = restoredSession
   ? "已恢复上次对局。新对局将启用扩展演示牌池。"
   : "新对局准备中：洗牌并发初始手牌。";
@@ -43,6 +47,7 @@ subscribeSession((reason) => {
     openingDealActive = false;
     animationRunning = false;
     turnFlipEpoch += 1;
+    turnMotion.cancel();
     turnFlipAnimating = false;
     notice = "已同步另一窗口中的对局。";
   }
@@ -58,7 +63,10 @@ let animationEpoch = 0;
 render();
 if (openingDealActive) void playOpeningDeal();
 
-function render(): void {
+function render(turnOrigin?: TurnPose | null): void {
+  // Carry only the optical pose across the existing render, not another game state.
+  // Stable public-board/overlay mounting is deliberately reserved for R3.
+  const carriedPose = turnOrigin ?? turnMotion.capture();
   session = readSession();
   const state = session.state;
   const active = state.activePlayer;
@@ -152,6 +160,14 @@ function render(): void {
   `;
 
   bindEvents();
+  const turnButton = document.querySelector<HTMLButtonElement>("#end-turn");
+  syncEndTurnArt(turnButton);
+  turnMotion.mount(turnButton, {
+    face: session.handoffRequired ? "back" : "front",
+    // Temporary flip input-lock is not a reason to extinguish the amber material.
+    ready: !session.handoffRequired && !state.winner && !openingDealActive
+      && !animationRunning && hiddenDrawCount === 0 && !hasPendingEffects(session),
+  }, carriedPose, turnFlipAnimating);
   publishViewRendered();
 }
 
@@ -306,7 +322,7 @@ async function endTurnWithFlip(): Promise<void> {
   const button = document.querySelector<HTMLButtonElement>("#end-turn");
   if (!button || button.disabled) return;
 
-  const fromFace = currentPresentedTurnFace();
+  const origin = turnMotion.capture();
   turnFlipAnimating = true;
   const flipEpoch = ++turnFlipEpoch;
   const next = otherPlayer(session.state.activePlayer);
@@ -324,9 +340,8 @@ async function endTurnWithFlip(): Promise<void> {
   selectedAttackerId = null;
   selectedHandIndex = null;
   notice = "回合结束，进入交接。";
-  const toFace = authoritativeTurnFace();
-  render();
-  await playTurnFlip(fromFace, toFace, flipEpoch);
+  render(origin);
+  await playTurnFlip(flipEpoch);
 }
 
 async function revealTurnWithFlip(): Promise<void> {
@@ -334,7 +349,7 @@ async function revealTurnWithFlip(): Promise<void> {
   const reveal = document.querySelector<HTMLButtonElement>("#reveal-turn");
   if (!reveal || reveal.disabled) return;
 
-  const fromFace = currentPresentedTurnFace();
+  const origin = turnMotion.capture();
   turnFlipAnimating = true;
   const flipEpoch = ++turnFlipEpoch;
   const error = dispatchGame({ type: "reveal-turn" });
@@ -350,101 +365,26 @@ async function revealTurnWithFlip(): Promise<void> {
   pendingTurnDrawCount = 0;
   hiddenDrawCount = drawCount;
   notice = `${playerLabel(session.state.activePlayer)}已接手。`;
-  const toFace = authoritativeTurnFace();
-  render();
-  await playTurnFlip(fromFace, toFace, flipEpoch);
+  render(origin);
+  const completed = await playTurnFlip(flipEpoch);
   if (flipEpoch !== turnFlipEpoch) return;
-  if (drawCount > 0) void playTurnDraw(drawCount);
+  if (completed && drawCount > 0) void playTurnDraw(drawCount);
 }
 
-async function playTurnFlip(fromFace: TurnControlFace, toFace: TurnControlFace, epoch: number): Promise<void> {
-  const core = document.querySelector<HTMLElement>(".v2-turn-core");
-  const button = document.querySelector<HTMLButtonElement>("#end-turn");
-  if (!core || !button || epoch !== turnFlipEpoch) {
-    finishTurnFlip(epoch);
-    return;
-  }
-
-  button.dataset.turnFlipping = "true";
-  button.setAttribute("aria-busy", "true");
-  // render() already reflects the committed target state. Restore the old face
-  // synchronously before paint, then animate only the movable core toward it.
-  setTurnCoreFace(core, fromFace);
-
-  if (fromFace === toFace) {
-    finishTurnFlip(epoch);
-    return;
-  }
-
-  if (reducedMotion()) {
-    setTurnCoreFace(core, toFace);
-    try {
-      await core.animate([{ opacity: 0.72 }, { opacity: 1 }], {
-        duration: 70,
-        easing: "ease-out",
-      }).finished;
-    } catch {
-      // Cosmetic motion can be cancelled by navigation or a newer render.
-    }
-    finishTurnFlip(epoch);
-    return;
-  }
-
+async function playTurnFlip(epoch: number): Promise<boolean> {
+  let completed = false;
   try {
-    const flipOut = core.animate([
-      { transform: "translateY(0) rotateX(0deg) scale(1)", filter: "brightness(1)" },
-      { transform: "translateY(1.378px) rotateX(0deg) scale(.985)", filter: "brightness(.92)", offset: 0.22 },
-      { transform: "translateY(0) rotateX(90deg) scale(.99)", filter: "brightness(.84)" },
-    ], {
-      duration: 145,
-      easing: "cubic-bezier(.4,0,.72,1)",
-      fill: "forwards",
-    });
-    await flipOut.finished;
-    if (epoch !== turnFlipEpoch) return;
-
-    setTurnCoreFace(core, toFace);
-    const flipIn = core.animate([
-      { transform: "translateY(0) rotateX(-90deg) scale(.99)", filter: "brightness(.84)" },
-      { transform: "translateY(0) rotateX(0deg) scale(1)", filter: "brightness(1)" },
-    ], {
-      duration: 135,
-      easing: "cubic-bezier(.2,.72,.24,1)",
-      fill: "forwards",
-    });
-    await flipIn.finished;
-  } catch {
-    // The command is already authoritative. Cancellation must converge to the
-    // saved face; it can never roll back or delay the real turn transition.
-    if (epoch === turnFlipEpoch) setTurnCoreFace(core, toFace);
+    completed = await turnMotion.play() === "completed";
+  } finally {
+    if (epoch === turnFlipEpoch) {
+      // Cards were already drawn by the rule command. A discarded visual
+      // transition must not start new cosmetic work in the background.
+      if (!completed) hiddenDrawCount = 0;
+      turnFlipAnimating = false;
+      render();
+    }
   }
-
-  finishTurnFlip(epoch);
-}
-
-function setTurnCoreFace(core: HTMLElement, face: TurnControlFace): void {
-  core.dataset.turnFace = face;
-  const front = core.querySelector<HTMLElement>('[data-turn-face-panel="front"]');
-  const back = core.querySelector<HTMLElement>('[data-turn-face-panel="back"]');
-  front?.setAttribute("aria-hidden", String(face !== "front"));
-  back?.setAttribute("aria-hidden", String(face !== "back"));
-}
-
-function finishTurnFlip(epoch: number): void {
-  if (epoch !== turnFlipEpoch) return;
-  turnFlipAnimating = false;
-  render();
-}
-
-function currentPresentedTurnFace(): TurnControlFace {
-  return document.querySelector<HTMLElement>(".v2-turn-core")?.dataset.turnFace === "back" ? "back" : "front";
-}
-
-function authoritativeTurnFace(): TurnControlFace {
-  return turnFace(deriveTurnControlState({
-    handoffRequired: session.handoffRequired,
-    blocked: Boolean(session.state.winner || openingDealActive || animationRunning || hasPendingEffects(session)),
-  }));
+  return completed;
 }
 
 function interactionBusy(): boolean {
@@ -454,6 +394,7 @@ function interactionBusy(): boolean {
 function startNewGame(): void {
   animationEpoch += 1;
   turnFlipEpoch += 1;
+  turnMotion.cancel();
   turnFlipAnimating = false;
   resetGame();
   session = readSession();

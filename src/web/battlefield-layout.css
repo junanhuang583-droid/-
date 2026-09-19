@@ -104,18 +104,19 @@ body.ab-hand-gesture-active .active-board .minion { left: calc(50% + var(--battl
   transform:none; filter:none; opacity:1; touch-action:manipulation;
   -webkit-tap-highlight-color:transparent; perspective:420px; perspective-origin:50% 50%;
 }
-/* R1 prepares one physical plate. The existing outer carrier's animation
- * remains legacy until R2; no new timing or game-state owner is added here. */
+/* R2: the carrier only seats/presses the shared plate. Rotation belongs to
+ * .v2-turn-plate. Neither 3D owner may be filtered, faded or clipped. */
 .v2-turn-core {
   position:absolute; display:block; background:none; border:0;
   --turn-plate-angle:0deg;
   transform-origin:50% 50%; transform-style:preserve-3d;
-  will-change:transform; transition:transform 100ms ease;
+  filter:none; overflow:visible; opacity:1;
 }
 .v2-turn-core[data-turn-face="back"] { --turn-plate-angle:180deg; }
 .v2-turn-plate {
   position:absolute; inset:0; display:block; pointer-events:none;
   transform-style:preserve-3d; transform-origin:50% 50%;
+  filter:none; overflow:visible; opacity:1;
   transform:translateZ(calc(-1 * var(--turn-plate-half-depth))) rotateX(var(--turn-plate-angle));
 }
 .v2-turn-face {
@@ -144,7 +145,19 @@ body.ab-hand-gesture-active .active-board .minion { left: calc(50% + var(--battl
 #end-turn.end-turn-art-ready .v2-turn-face::before { display:none; }
 #end-turn.end-turn-art-ready .v2-turn-texture > img { display:block; }
 .v2-turn-rim { position:absolute; z-index:4; pointer-events:none; }
-.v2-turn-light { opacity:1; transition:opacity 120ms ease; }
+.v2-turn-light { opacity:1; }
+.v2-turn-contact {
+  position:absolute; pointer-events:none; opacity:.22;
+  background:radial-gradient(ellipse at center,#000b,transparent 67%);
+  transform:translateY(22px); z-index:0;
+}
+.v2-turn-shade,.v2-turn-sheen {
+  position:absolute; inset:0; pointer-events:none; opacity:0;
+  clip-path:polygon(19.4% 0,82.1% 0,100% 25%,100% 75%,82.7% 100%,18.4% 100%,0 75%,0 25%);
+}
+.v2-turn-shade { z-index:4; background:#090d13; }
+.v2-turn-sheen { z-index:5; background:linear-gradient(165deg,transparent 20%,#ffe7b7 48%,transparent 73%); }
+#end-turn[data-turn-flipping="true"] .v2-turn-plate { will-change:transform; }
 .end-turn-label { position:relative; z-index:3; opacity:1; color:#211609; font-size:20px; font-weight:800; line-height:1;
   white-space:nowrap; text-shadow:0 1px 1px #ffe7a0,0 -1px 1px #ffd16c; pointer-events:none; }
 .end-turn-back-fallback { position:relative; z-index:3; color:#c8beb0; font-size:15px; font-weight:700; line-height:1; white-space:nowrap; text-shadow:0 1px 2px #000; pointer-events:none; }
@@ -152,14 +165,8 @@ body.ab-hand-gesture-active .active-board .minion { left: calc(50% + var(--battl
 #end-turn.end-turn-art-ready .end-turn-back-fallback { display:none; }
 #end-turn:disabled { cursor:not-allowed; opacity:1; filter:none; }
 #end-turn[data-turn-state="back-waiting"] { cursor:default; }
-#end-turn:disabled .v2-turn-light { opacity:0; }
-#end-turn:disabled .end-turn-label { color:#b9b3a6; text-shadow:0 1px 2px #000; }
-#end-turn:enabled:active .v2-turn-core { transform:translateY(1.378px) scale(.985); }
-#end-turn:enabled:active .v2-turn-face { filter:brightness(.92); }
-#end-turn[data-turn-flipping="true"] .v2-turn-core { transition:none; }
 #end-turn:focus-visible { outline:2px solid #f6d598; outline-offset:3px; }
 #end-turn::before,#end-turn::after { display:none; }
-@media (hover:hover) and (pointer:fine) { #end-turn:enabled:hover .v2-turn-face { filter:brightness(1.06); } }
 /* Static housing, rim and hitbox are intentionally outside the motion target. */
 .cd-private-back.cd-card-back { border:0; background:none; box-shadow:0 3px 10px #0006; }
 .cd-private-back.cd-card-back::before,.cd-private-back.cd-card-back::after { display:none; }
@@ -213,8 +220,7 @@ body.cd-handoff-private .hand-row { visibility: hidden; }
  * away from their baked housings in portrait. Tool/menu controls remain in screen space. */
 @media (prefers-reduced-motion: reduce) {
   .hand-dock, .hand-card, .board-slot { transition: none; }
-  #end-turn:enabled:active .v2-turn-core { transform:none; }
-  .v2-turn-core,.v2-turn-light { transition:none; }
+  .v2-turn-plate { will-change:auto; }
 }
 
 .session-private .hand-row { visibility: hidden; }

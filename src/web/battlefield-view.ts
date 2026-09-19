@@ -26,6 +26,7 @@ export function turnView(state: TurnControlState): string {
   const backHidden = face !== "back";
   return `<div class="v2-turn" data-battlefield-anchor="turn-actions" data-turn-state="${state}" style="${fixedRect(V2.turnInput)}">
     <button id="end-turn" type="button" data-turn-state="${state}" aria-label="${turnControlAriaLabel(state)}" ${disabled?'disabled':''}>
+      <span class="v2-turn-contact" aria-hidden="true" style="${relativeRect(V2.core,V2.turnInput)}"></span>
       <span class="v2-turn-core" data-flip-axis="x" data-turn-face="${face}" style="${relativeRect(V2.core,V2.turnInput)};${turnPlateStyle()}">
         <span class="v2-turn-plate">
         <span class="v2-turn-face v2-turn-face-front" data-turn-face-panel="front" aria-hidden="${frontHidden}">
@@ -33,12 +34,14 @@ export function turnView(state: TurnControlState): string {
             ${img('turn-core-front-neutral','v2-turn-neutral',turnTextureImageStyle('front'))}${img('turn-core-light','v2-turn-light',turnTextureImageStyle('front'))}
           </span>
           <span class="end-turn-label">结束回合</span>
+          <span class="v2-turn-shade" aria-hidden="true"></span><span class="v2-turn-sheen" aria-hidden="true"></span>
         </span>
         <span class="v2-turn-face v2-turn-face-back" data-turn-face-panel="back" aria-hidden="${backHidden}">
           <span class="v2-turn-texture" data-turn-texture="back" style="${turnTextureStyle('back')}">
             ${img('turn-core-back','v2-turn-back',turnTextureImageStyle('back'))}
           </span>
           <span class="end-turn-back-fallback">等待接手</span>
+          <span class="v2-turn-shade" aria-hidden="true"></span><span class="v2-turn-sheen" aria-hidden="true"></span>
         </span>
         ${turnPlateEdges().map((style, index) => `<span class="v2-turn-edge" data-turn-edge="${index}" aria-hidden="true" style="${style}"></span>`).join('')}
         </span>

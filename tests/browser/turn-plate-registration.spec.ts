@@ -82,7 +82,7 @@ for (const [width, height] of [[1536,691], [740,360]] as const) {
     await shot(page, info, 'r1-back-static');
 
     // A held side pose of the real plate, NOT final motion acceptance.
-    await plate.evaluate(element => (element as HTMLElement).style.setProperty('--turn-plate-angle','90deg'));
+    await plate.evaluate(element => (element as HTMLElement).style.setProperty('transform','translateZ(-1.5px) rotateX(90deg)'));
     const matrix = await plate.evaluate(element => {
       const m=new DOMMatrixReadOnly(getComputedStyle(element).transform);
       return { m22:m.m22, m23:m.m23 };
@@ -99,7 +99,7 @@ for (const [width, height] of [[1536,691], [740,360]] as const) {
       near(rimAfter![key],rimBefore![key]);near(after![key],before![key]);
     }
     await shot(page, info, 'r1-side-static');
-    await plate.evaluate(element => (element as HTMLElement).style.removeProperty('--turn-plate-angle'));
+    await plate.evaluate(element => (element as HTMLElement).style.setProperty('transform','translateZ(-1.5px) rotateX(180deg)'));
     await page.locator('#reveal-turn').click();
     await expect(input).toBeEnabled();
     await expect(core).toHaveAttribute('data-turn-face','front');
