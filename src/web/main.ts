@@ -1,3 +1,5 @@
+import { battlefieldBackground, deckView, turnView, heroView } from "./battlefield-view.js";
+import { v2Asset } from "../application/battlefield-v2.js";
 import {
   canMinionAttack,
   hasPendingEffects,
@@ -77,8 +79,8 @@ function render(): void {
           </div>
 
       <section class="battlefield-viewport" aria-label="战场">
-        <div class="battlefield-coordinate-layer" data-battlefield-design="1152x648" data-stage07-lock="battlefield-v1">
-          <div id="battlefield-background" aria-hidden="true"><img src="./assets/battlefield/gothic-abyss.webp" alt="" draggable="false" fetchpriority="high" /></div>
+        <div class="battlefield-coordinate-layer" data-battlefield-design="1152x648" data-stage07-lock="battlefield-v2-2d3">
+          ${battlefieldBackground()}
           <div class="battlefield-future-anchor" data-battlefield-anchor="discard-future" aria-hidden="true"></div>
           <section class="battle-shell">
         ${heroPanel(opponent, false)}
@@ -86,7 +88,7 @@ function render(): void {
 
         <section class="scene-lane" data-battlefield-anchor="scene">
           <div class="scene-placeholder">
-            <span>场景</span>
+            <span class="scene-label">场景</span>
             <small>${selectedAttackerId ? `已选择攻击者，点击敌方随从或${playerLabel(opponent)}英雄` : ""}</small>
           </div>
         </section>
@@ -95,20 +97,8 @@ function render(): void {
         ${boardZone(active, true)}
 
         <aside class="battle-rail" data-battlefield-anchor="right-rail">
-          <div class="rail-group" data-battlefield-anchor="shared-deck">
-            <span class="rail-label">牌库</span>
-            <div id="deck-source" class="deck-stack" aria-label="共享牌库">
-              <span class="deck-card deck-card-back"></span>
-              <span class="deck-card deck-card-mid"></span>
-              <span class="deck-card deck-card-front">CG</span>
-            </div>
-            <strong>${state.sharedDeck.length} 张</strong>
-            <small>${catalog.playableUniqueCards} 种可运行随从</small>
-            <small>P1 弃牌 ${state.players.P1.discardPile.length} · P2 弃牌 ${state.players.P2.discardPile.length}</small>
-          </div>
-          <div class="rail-actions" data-battlefield-anchor="turn-actions">
-            <button id="end-turn" class="primary-button turn-button stage07-end-turn-device" data-stage07-control="end-turn" aria-label="结束回合" ${state.winner || session.handoffRequired || hasPendingEffects(session) || interactionLocked ? "disabled" : ""}><span class="end-turn-label">结束回合</span></button>
-          </div>
+          ${deckView(state.sharedDeck.length)}
+          ${turnView(Boolean(state.winner || interactionLocked || session.handoffRequired || hasPendingEffects(session)))}
         </aside>
       </section>
 
@@ -156,20 +146,8 @@ function render(): void {
 
 function heroPanel(playerId: PlayerId, isActive: boolean): string {
   const player = session.state.players[playerId];
-  const isTarget = !isActive && selectedAttackerId !== null && !session.handoffRequired && !animationRunning;
-  const tag = isTarget ? "button" : "div";
-  const targetAttrs = isTarget ? `data-hero-target="${playerId}"` : "";
-  return `
-    <${tag} class="hero-panel ${isActive ? "active-hero" : "opponent-hero"} ${isTarget ? "hero-target-ready" : ""}" data-battlefield-anchor="${isActive ? "active-hero" : "opponent-hero"}" ${targetAttrs}>
-      <div class="hero-portrait"><span>${playerId === "P1" ? "1" : "2"}</span></div>
-      <div class="hero-copy">
-        <span>${playerLabel(playerId)}</span>
-        <strong>♥ ${player.health}</strong>
-        <small>${session.state.activePlayer === playerId ? "当前回合" : "等待"} · 手牌 ${player.hand.length}</small>
-      </div>
-      <div class="equipment-slot" title="装备位将在后续版本启用">装备</div>
-    </${tag}>
-  `;
+  const target = !isActive && selectedAttackerId !== null && !session.handoffRequired && !animationRunning;
+  return heroView(playerId, isActive, player.health, player.hand.length, target);
 }
 
 function boardZone(playerId: PlayerId, isActivePanel: boolean): string {
@@ -448,7 +426,7 @@ async function flyCardTo(
   const targetRect = target.getBoundingClientRect();
   const card = document.createElement("div");
   card.className = `flying-card flying-card-${kind}`;
-  card.innerHTML = `<span>CG</span>`;
+  card.innerHTML = `<img src="${v2Asset("card-back-final")}" alt="" draggable="false" />`;
   layer.append(card);
 
   const width = Math.max(22, Math.min(42, sourceRect.width * 0.54));

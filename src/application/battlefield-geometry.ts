@@ -1,3 +1,4 @@
+import { V2_ANCHORS } from "./battlefield-v2.js";
 export const BATTLEFIELD = { width: 1152, height: 648 } as const;
 export interface ViewportTransform {
   scale: number; offsetX: number; offsetY: number;
@@ -19,29 +20,29 @@ export function screenToWorld(t: ViewportTransform, x: number, y: number) {
 /** Fixed architectural sockets use image coordinates. V2 must jointly approve
  * these anchors and its crop-safe artwork; responsive gameplay rows are not
  * architectural sockets and may move inside the visible image crop. */
-export const FIXED_SOCKETS = { deck: { x: 180, y: 258 }, endTurn: { x: 1008, y: 258 }, scene: { x: 576, y: 270 } } as const;
+export const FIXED_SOCKETS = { deck: V2_ANCHORS.deck, endTurn: V2_ANCHORS.endTurn, scene: { x: 576, y: 270 } } as const;
 
-export const HERO_HEIGHT = 55;
-export const HERO_LINE_CLEARANCE = 6;
+export const HERO_HEIGHT = 132;
+export const HERO_LINE_CLEARANCE = 8;
 
-/** Shared dimensions and centers, expressed in authored-world pixels.
- * Percentage-only centers overlap fixed-height heroes on wide, short screens.
- * Enforce their physical extents here instead of adding another CSS override. */
+/** Fit complete V2 portrait groups inside the visible crop. Enforce actual
+ * frame extents, minion rows, scene clearance and the collapsed hand band. */
 export function gameplayGeometry(t: ViewportTransform) {
   const v = t.visible;
-  const unitHeight = Math.min(86, v.height * .165);
-  const opponentHeroY = v.y + v.height * .08;
-  const activeHeroY = v.y + v.height * .705;
-  const separation = HERO_HEIGHT / 2 + unitHeight / 2 + HERO_LINE_CLEARANCE;
+  const unitHeight = Math.min(78, v.height * .12);
+  const topMargin = 6;
+  const sceneTop = FIXED_SOCKETS.scene.y - 15;
+  const heroHeight = Math.max(48, Math.min(HERO_HEIGHT, v.height * .215,
+    sceneTop - v.y - unitHeight - topMargin - HERO_LINE_CLEARANCE - 4));
+  const opponentHeroY = v.y + topMargin + heroHeight / 2;
+  const opponentLineY = opponentHeroY + heroHeight / 2 + HERO_LINE_CLEARANCE + unitHeight / 2;
+  const activeHeroY = v.y + v.height - 68 - heroHeight / 2;
+  const activeLineY = activeHeroY - heroHeight / 2 - HERO_LINE_CLEARANCE - unitHeight / 2;
   return {
-    heroHeight: HERO_HEIGHT,
-    opponentHeroY,
-    opponentLineY: Math.max(v.y + v.height * .215, opponentHeroY + separation),
-    activeLineY: Math.min(v.y + v.height * .54, activeHeroY - separation),
-    activeHeroY,
+    heroHeight, opponentHeroY, opponentLineY, activeLineY, activeHeroY,
     handBottomY: v.y + v.height,
-    unitWidth: Math.min(96, v.height * .152),
+    unitWidth: Math.min(88, v.height * .135),
     unitHeight,
-    unitStep: Math.min(106, v.height * .17),
+    unitStep: Math.min(104, v.height * .165),
   };
 }

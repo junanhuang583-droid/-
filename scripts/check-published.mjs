@@ -67,8 +67,8 @@ try {
         const background = document.querySelector("#battlefield-background img");
         await background.decode();
         const button = document.querySelector("#end-turn");
-        const artUrl = getComputedStyle(button).getPropertyValue("--end-turn-art").match(/url\(["']?(.*?)["']?\)/)?.[1];
-        const art = new Image(); art.src = artUrl; await art.decode();
+        const turnArt = [...button.querySelectorAll(".v2-turn-core img")];
+        await Promise.all(turnArt.map(image => image.decode()));
         const rect = element => element.getBoundingClientRect().toJSON();
         const hit = element => {
           const r = element.getBoundingClientRect();
@@ -76,7 +76,7 @@ try {
         };
         return {
           plane: rect(plane), image: rect(background), authored: { width: plane.offsetWidth, height: plane.offsetHeight },
-          imageDecoded: background.naturalWidth > 0, artworkDecoded: art.naturalWidth > 0,
+          imageDecoded: background.naturalWidth > 0, artworkDecoded: turnArt.length >= 2 && turnArt.every(image => image.naturalWidth > 0),
           button: rect(button), buttonHit: hit(button),
           fakeSocket: Boolean(document.querySelector(".battlefield-fusion-layer,.stage072b-end-turn-socket")),
           scene: rect(document.querySelector(".scene-lane")),

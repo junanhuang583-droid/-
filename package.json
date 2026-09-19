@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "generate:icons": "node scripts/generate-pwa-icons.mjs",
-    "predev": "npm run generate:icons && npm run materialize:battlefield && npm run materialize:stage07-ui",
+    "predev": "npm run generate:icons && npm run materialize:battlefield && npm run materialize:stage07-ui && npm run materialize:v2",
     "dev": "vite",
-    "prebuild": "npm run generate:icons && npm run materialize:battlefield && npm run materialize:stage07-ui",
+    "prebuild": "npm run generate:icons && npm run materialize:battlefield && npm run materialize:stage07-ui && npm run materialize:v2",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
@@ -16,7 +16,8 @@
     "materialize:stage07-ui": "node scripts/materialize-stage07-ui.mjs",
     "postbuild": "node scripts/build-service-worker.mjs",
     "test:browser": "playwright test",
-    "check": "npm run typecheck && npm test && npm run build"
+    "check": "npm run typecheck && npm test && npm run build",
+    "materialize:v2": "node scripts/materialize-v2.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.58.2",

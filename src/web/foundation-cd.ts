@@ -1,3 +1,4 @@
+import { v2Asset } from "../application/battlefield-v2.js";
 import { PROTOTYPE_SPECIAL_BY_ID } from "../data/prototype-special-cards.js";
 import type { CardId } from "../model/cards.js";
 import { byId } from "./game-catalog.js";
@@ -38,7 +39,6 @@ function sync(): void {
 
   decorateHand(session.state.players[session.state.activePlayer].hand);
   decorateBattleMinions(session);
-  decorateSharedDeck();
 }
 
 function decorateHand(hand: CardId[]): void {
@@ -106,10 +106,6 @@ function decorateBattleMinions(session: NonNullable<ReturnType<typeof readSessio
   });
 }
 
-function decorateSharedDeck(): void {
-  document.querySelectorAll<HTMLElement>(".deck-card").forEach((element) => element.classList.add("cd-card-back"));
-}
-
 function ensurePrivateHand(count: number): void {
   let privateHand = document.querySelector<HTMLElement>("#cd-private-hand");
   if (!privateHand) {
@@ -129,7 +125,7 @@ function ensurePrivateHand(count: number): void {
     const distance = index - center;
     const angle = Math.max(-11, Math.min(11, distance * 2.4));
     const y = Math.min(12, Math.abs(distance) * 1.6);
-    return `<span class="cd-private-back cd-card-back" style="--cd-private-angle:${angle}deg;--cd-private-y:${y}px;--cd-private-z:${100 - Math.round(Math.abs(distance))}"><i>CG</i></span>`;
+    return `<span class="cd-private-back cd-card-back" style="--cd-private-angle:${angle}deg;--cd-private-y:${y}px;--cd-private-z:${100 - Math.round(Math.abs(distance))}"><img src="${v2Asset("card-back-final")}" alt="" draggable="false" /></span>`;
   }).join("");
 }
 
