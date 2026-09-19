@@ -176,3 +176,55 @@ test("end-turn face follows authoritative hot-seat handoff state", async ({ page
   await expect(page.locator('[data-turn-face-panel="back"]')).toHaveCSS("visibility", "hidden");
   await screenshot(page, info, "turn-front-restored");
 });
+
+
+test("3A-3 guards rapid end-turn and reveal re-entry", async ({ page }) => {
+  const s = fresh();
+  s.state.sharedDeck = [];
+  s.state.players.P1.discardPile = [];
+  s.state.players.P2.discardPile = [];
+  await seed(page, s);
+  await ready(page);
+
+  const beforeEnd = await state(page);
+  await page.locator("#end-turn").evaluate((button: HTMLButtonElement) => {
+    button.click();
+    button.click();
+  });
+  await expect(page.locator("#reveal-turn")).toBeVisible();
+  const afterEnd = await state(page);
+  expect(afterEnd.state.turn).toBe(beforeEnd.state.turn + 1);
+  expect(afterEnd.revision).toBe(beforeEnd.revision + 1);
+
+  const beforeReveal = await state(page);
+  await page.locator("#reveal-turn").evaluate((button: HTMLButtonElement) => {
+    button.click();
+    button.click();
+  });
+  await expect(page.locator("#end-turn")).toHaveAttribute("data-turn-state", "front-ready");
+  const afterReveal = await state(page);
+  expect(afterReveal.state.turn).toBe(beforeReveal.state.turn);
+  expect(afterReveal.revision).toBe(beforeReveal.revision + 1);
+});
+
+test("3A-3 keyboard activation uses the same guarded turn path", async ({ page }) => {
+  const s = fresh();
+  s.state.sharedDeck = [];
+  s.state.players.P1.discardPile = [];
+  s.state.players.P2.discardPile = [];
+  await seed(page, s);
+  await ready(page);
+  const before = await state(page);
+
+  await page.locator("#end-turn").focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#reveal-turn")).toBeVisible();
+  await page.locator("#reveal-turn").click();
+  await expect(page.locator("#end-turn")).toHaveAttribute("data-turn-state", "front-ready");
+
+  await page.locator("#end-turn").focus();
+  await page.keyboard.press("Space");
+  await expect(page.locator("#reveal-turn")).toBeVisible();
+  const after = await state(page);
+  expect(after.state.turn).toBe(before.state.turn + 2);
+});
