@@ -195,7 +195,7 @@ test("3A-3 guards rapid end-turn and reveal re-entry", async ({ page }) => {
   await expect(page.locator("#reveal-turn")).toBeVisible();
   const afterEnd = await state(page);
   expect(afterEnd.state.turn).toBe(beforeEnd.state.turn + 1);
-  expect(afterEnd.revision).toBe(beforeEnd.revision + 1);
+  expect(afterEnd.revision).toBe((beforeEnd.revision ?? 0) + 1);
 
   const beforeReveal = await state(page);
   await page.locator("#reveal-turn").evaluate((element) => {
@@ -206,7 +206,7 @@ test("3A-3 guards rapid end-turn and reveal re-entry", async ({ page }) => {
   await expect(page.locator("#end-turn")).toHaveAttribute("data-turn-state", "front-ready");
   const afterReveal = await state(page);
   expect(afterReveal.state.turn).toBe(beforeReveal.state.turn);
-  expect(afterReveal.revision).toBe(beforeReveal.revision + 1);
+  expect(afterReveal.revision).toBe((beforeReveal.revision ?? 0) + 1);
 });
 
 test("3A-3 keyboard activation uses the same guarded turn path", async ({ page }) => {
