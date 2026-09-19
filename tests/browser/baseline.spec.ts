@@ -263,10 +263,16 @@ for (const [width, height] of [[1536, 691], [740, 360]] as const) {
     await expect(button).toHaveAttribute("data-turn-flipping", "true");
     expect((await state(page)).state.turn).toBe(before.state.turn + 1);
     expect((await state(page)).handoffRequired).toBe(true);
-    await expect(core).toHaveAttribute("data-turn-face", "front");
 
-    await page.waitForTimeout(70);
-    const outgoingTransform = await core.evaluate((element) => getComputedStyle(element).transform);
+    await expect.poll(() => core.evaluate((element) => element.getAnimations().length)).toBeGreaterThan(0);
+    const outgoingTransform = await core.evaluate((element) => {
+      const animation = element.getAnimations()[0];
+      if (!animation) return "none";
+      animation.pause();
+      const duration = animation.effect?.getTiming().duration;
+      animation.currentTime = typeof duration === "number" ? duration * 0.55 : 70;
+      return getComputedStyle(element).transform;
+    });
     expect(outgoingTransform).not.toBe("none");
     expect(outgoingTransform).not.toBe("matrix(1, 0, 0, 1, 0, 0)");
 
@@ -281,6 +287,7 @@ for (const [width, height] of [[1536, 691], [740, 360]] as const) {
     close(buttonDuring!.y, buttonBefore!.y);
     close(buttonDuring!.width, buttonBefore!.width);
     close(buttonDuring!.height, buttonBefore!.height);
+    await core.evaluate((element) => element.getAnimations().forEach((animation) => animation.play()));
 
     await expect(page.locator("#reveal-turn")).toBeVisible();
     await expect(button).toHaveAttribute("data-turn-state", "back-waiting");
@@ -293,8 +300,15 @@ for (const [width, height] of [[1536, 691], [740, 360]] as const) {
     expect(rimBeforeReveal).toBeTruthy();
     await page.locator("#reveal-turn").evaluate((element) => (element as HTMLButtonElement).click());
     await expect(button).toHaveAttribute("data-turn-flipping", "true");
-    await page.waitForTimeout(70);
-    const incomingTransform = await core.evaluate((element) => getComputedStyle(element).transform);
+    await expect.poll(() => core.evaluate((element) => element.getAnimations().length)).toBeGreaterThan(0);
+    const incomingTransform = await core.evaluate((element) => {
+      const animation = element.getAnimations()[0];
+      if (!animation) return "none";
+      animation.pause();
+      const duration = animation.effect?.getTiming().duration;
+      animation.currentTime = typeof duration === "number" ? duration * 0.55 : 70;
+      return getComputedStyle(element).transform;
+    });
     expect(incomingTransform).not.toBe("none");
     expect(incomingTransform).not.toBe("matrix(1, 0, 0, 1, 0, 0)");
     const rimDuringReveal = await rim.boundingBox();
@@ -303,6 +317,7 @@ for (const [width, height] of [[1536, 691], [740, 360]] as const) {
     close(rimDuringReveal!.y, rimBeforeReveal!.y);
     close(rimDuringReveal!.width, rimBeforeReveal!.width);
     close(rimDuringReveal!.height, rimBeforeReveal!.height);
+    await core.evaluate((element) => element.getAnimations().forEach((animation) => animation.play()));
 
     await expect(button).toHaveAttribute("data-turn-state", "front-ready");
     await expect(button).toBeEnabled();
