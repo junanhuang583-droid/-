@@ -187,7 +187,8 @@ test("3A-3 guards rapid end-turn and reveal re-entry", async ({ page }) => {
   await ready(page);
 
   const beforeEnd = await state(page);
-  await page.locator("#end-turn").evaluate((button: HTMLButtonElement) => {
+  await page.locator("#end-turn").evaluate((element) => {
+    const button = element as HTMLButtonElement;
     button.click();
     button.click();
   });
@@ -197,7 +198,8 @@ test("3A-3 guards rapid end-turn and reveal re-entry", async ({ page }) => {
   expect(afterEnd.revision).toBe(beforeEnd.revision + 1);
 
   const beforeReveal = await state(page);
-  await page.locator("#reveal-turn").evaluate((button: HTMLButtonElement) => {
+  await page.locator("#reveal-turn").evaluate((element) => {
+    const button = element as HTMLButtonElement;
     button.click();
     button.click();
   });
