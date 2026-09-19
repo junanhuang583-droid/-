@@ -1,17 +1,19 @@
-import endTurnUrl from "./assets/ui-stage07/end-turn-device.webp";
-import { onViewRendered } from "./view-events.js";
+import { v2Asset } from '../application/battlefield-v2.js';
+import { onViewRendered } from './view-events.js';
 
-let available = false;
-const probe = new Image();
-probe.onload = () => { available = probe.naturalWidth > 0; sync(); };
-probe.onerror = () => { available = false; sync(); };
-probe.src = endTurnUrl;
+const decoded = new Set<string>();
+const required = ['turn-core-front-neutral','turn-core-light'] as const;
+for (const name of required) {
+  const probe = new Image();
+  probe.onload = () => { if (probe.naturalWidth > 0) decoded.add(name); sync(); };
+  probe.onerror = () => { decoded.delete(name); sync(); };
+  probe.src = v2Asset(name);
+}
 onViewRendered(sync, 90);
 function sync(): void {
-  const button = document.querySelector<HTMLButtonElement>("#end-turn");
+  const button = document.querySelector<HTMLButtonElement>('#end-turn');
   if (!button) return;
-  button.classList.toggle("end-turn-art-ready", available);
-  button.style.setProperty("--end-turn-art", `url("${endTurnUrl}")`);
-  // The real text remains available to assistive technology, and visible when
-  // the asset is missing or corrupt. No invisible-but-clickable controls.
+  button.classList.toggle('end-turn-art-ready',required.every(name => decoded.has(name)));
+  // Text always remains live/readable, including load failure and disabled state.
+  // Only the core animates. The true button and retaining brackets stay fixed.
 }

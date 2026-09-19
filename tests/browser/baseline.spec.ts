@@ -94,7 +94,7 @@ test("control queue survives reload between two different target choices", async
 
 for (const failure of ["missing", "corrupt"]) {
   test(`art ${failure}: visible text fallback remains usable`, async ({ page }, info) => {
-    await seed(page); await page.route("**/*end-turn-device*.webp", r => failure === "missing" ? r.abort() : r.fulfill({ status: 200, contentType: "image/webp", body: "broken bytes" }));
+    await seed(page); await page.route("**/*turn-core-*.webp", r => failure === "missing" ? r.abort() : r.fulfill({ status: 200, contentType: "image/webp", body: "broken bytes" }));
     await page.goto("./"); await expect(page.locator(".battlefield-coordinate-layer")).toHaveAttribute("data-viewport-scale", /.+/);
     await expect(page.locator("#end-turn")).not.toHaveClass(/end-turn-art-ready/);
     await expect(page.locator(".end-turn-label")).toHaveCSS("opacity", "1"); await screenshot(page, info, "fallback");

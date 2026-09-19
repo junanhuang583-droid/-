@@ -25,17 +25,29 @@ body { min-width: 320px; background: #080b10; }
 .battle-shell .hero-panel, .battle-shell .board-slot { pointer-events: auto; }
 .hero-panel {
   position: absolute; left: 50%; top: var(--opponent-hero-y); bottom: auto;
-  width: 146px; height: var(--hero-height); min-height: 0; padding: 0; gap: 7px;
-  display: grid; grid-template-columns: 48px 1fr; grid-template-rows: 1fr;
+  width: calc(var(--hero-height) * var(--hero-aspect, 1.08)); height: var(--hero-height);
+  min-width: 0; min-height: 0; padding: 0; display: block;
   transform: translate(-50%, -50%); background: transparent; border: 0;
-  box-shadow: none; z-index: var(--layer-units);
+  box-shadow: none; z-index: var(--layer-controls); overflow: visible;
 }
 .active-hero { top: var(--active-hero-y); }
-.hero-portrait { width: 46px; height: 46px; font-size: 20px; }
-.hero-copy > span { font-size: 9px; }
-.hero-copy strong { font-size: 17px; }
-.hero-copy small { font-size: 7px; }
-.equipment-slot { display: none; }
+.v2-hero > img { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+.hero-portrait {
+  position:absolute; display:grid; place-items:center; padding:0;
+  border:0; border-radius:0; background:none; box-shadow:none;
+  color:#e0d4b8; font-family:Georgia,serif; font-size:calc(var(--hero-height) * .21);
+  pointer-events:none; text-shadow:0 2px 4px #000;
+}
+.v2-hero-health { position:absolute; display:grid; place-items:center; pointer-events:none; }
+.v2-health-art { position:absolute; inset:0; width:100%; height:100%; }
+.v2-hero-health strong {
+  position:relative; padding-top:16%; color:#fff4e2; font-family:Georgia,serif;
+  font-size:max(14px,calc(var(--hero-height) * .14)); line-height:1;
+  text-shadow:1px 1px 1px #100600,-1px -1px 1px #100600; font-weight:700;
+}
+.v2-hero-status { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+.hero-target-ready { cursor:crosshair; filter:drop-shadow(0 0 4px #d69047); }
+.equipment-slot { display:none; }
 .board-zone {
   position: absolute; left: 50%; top: var(--opponent-line-y); bottom: auto;
   width: 58%; height: var(--unit-height); padding: 0;
@@ -71,40 +83,50 @@ body.ab-hand-gesture-active .active-board .minion { left: calc(50% + var(--battl
   position: absolute; left: 50%; top: var(--scene-y); bottom: auto; transform: translate(-50%,-50%);
   width: 34%; height: 30px; z-index: var(--layer-units); pointer-events: auto;
 }
-.scene-placeholder { padding: 3px 8px; background: #18151070; border: 1px solid #a4835440; box-shadow: none; }
-.scene-placeholder span { font-size: 9px; }
-.scene-placeholder small:empty { display: none; }
-.battle-rail { display: contents; }
-[data-battlefield-anchor="shared-deck"] {
-  position: absolute; left: var(--deck-x); top: var(--deck-y); right: auto; bottom: auto;
-  width: 98px; transform: translate(-50%, -50%); padding: 5px;
-  background: #17151078; border: 1px solid #a4835440; border-radius: 7px;
-  pointer-events: auto; z-index: var(--layer-controls);
-}
-[data-battlefield-anchor="shared-deck"] small, .prototype-deck-chip { display: none; }
-[data-battlefield-anchor="shared-deck"] .deck-stack { width: 42px; }
-[data-battlefield-anchor="shared-deck"] strong { font-size: 11px; }
-[data-battlefield-anchor="shared-deck"] .rail-label { font-size: 9px; }
-[data-battlefield-anchor="turn-actions"] {
-  position: absolute; left: var(--end-turn-x); top: var(--end-turn-y); right: auto; bottom: auto;
-  width: 116px; height: max(58px, calc(44px / var(--world-scale, 1))); transform: translate(-50%, -50%); padding: 0;
-  display: block; pointer-events: auto; z-index: var(--layer-controls);
-}
+.scene-placeholder { padding:0; background:none; border:0; box-shadow:none; pointer-events:none; }
+.scene-label { display:none; }
+.scene-placeholder small:empty { display:none; }
+.scene-placeholder small:not(:empty) { padding:3px 8px; border-radius:12px; color:#e2ca9f; background:#14100ccd; font-size:9px; }
+.scene-lane { pointer-events:none; }
+.battle-rail { display:contents; }
+.prototype-deck-chip { display:none; }
+.v2-deck, .v2-turn { position:absolute; margin:0; padding:0; border:0; background:none; box-shadow:none; transform:none; z-index:var(--layer-controls); }
+.v2-deck { pointer-events:none; }
+.v2-deck-source, .v2-deck-rim, .v2-deck-count { position:absolute; }
+.v2-deck-slice { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; pointer-events:none; }
+.v2-deck-rim { z-index:5; pointer-events:none; }
+.v2-deck-count { z-index:6; display:flex; align-items:center; justify-content:center; color:#f1dfbb; font-family:Georgia,serif; font-weight:700; line-height:1; text-shadow:0 2px 2px #000; }
+.v2-turn { pointer-events:none; }
 #end-turn {
-  position: relative; display: grid; place-items: center; width: 100%; height: 100%;
-  min-width: 0; min-height: 44px; padding: 0; margin: 0; overflow: visible;
-  border: 1px solid #b19567; border-radius: 6px; background: #30271b;
-  color: #ffe6b4; font-size: 13px; line-height: 1; cursor: pointer;
-  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
-  transform: none; filter: none; box-shadow: none;
+  position:relative; display:block; width:100%; height:100%; min-width:0; min-height:0;
+  margin:0; padding:0; border:0; border-radius:0; background:none; box-shadow:none;
+  color:#ffe6b4; cursor:pointer; pointer-events:auto; overflow:visible;
+  transform:none; filter:none; opacity:1; touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
 }
-#end-turn.end-turn-art-ready { background: var(--end-turn-art) center / contain no-repeat; border: 0; }
-#end-turn.end-turn-art-ready .end-turn-label { opacity: 0; }
-#end-turn:disabled { opacity: .72; filter: grayscale(.85) brightness(.65); cursor: not-allowed; }
-#end-turn:enabled:hover { filter: brightness(1.08); }
-#end-turn:enabled:active { transform: translateY(2px) scale(.98); }
-#end-turn:focus-visible { outline: 2px solid #f6d598; outline-offset: 3px; }
-#end-turn::before, #end-turn::after { display: none; }
+.v2-turn-core { position:absolute; display:flex; align-items:center; justify-content:center; background:#30271b;
+  border:1px solid #b19567; border-radius:9px; transform-origin:50% 50%; transition:transform 100ms ease,filter 120ms ease; }
+.v2-turn-core > img { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; display:none; }
+#end-turn.end-turn-art-ready .v2-turn-core { border:0; background:none; }
+#end-turn.end-turn-art-ready .v2-turn-core > img { display:block; }
+.v2-turn-rim { position:absolute; z-index:4; pointer-events:none; }
+.v2-turn-light { opacity:1; transition:opacity 120ms ease; }
+.end-turn-label { position:relative; z-index:3; opacity:1; color:#211609; font-size:20px; font-weight:800; line-height:1;
+  white-space:nowrap; text-shadow:0 1px 1px #ffe7a0,0 -1px 1px #ffd16c; pointer-events:none; }
+#end-turn:not(.end-turn-art-ready) .end-turn-label { color:#ffe6b4; text-shadow:0 1px 1px #000; }
+#end-turn:disabled { cursor:not-allowed; opacity:1; filter:none; }
+#end-turn:disabled .v2-turn-light { opacity:0; }
+#end-turn:disabled .end-turn-label { color:#b9b3a6; text-shadow:0 1px 2px #000; }
+#end-turn:enabled:active .v2-turn-core { transform:translateY(1.378px) scale(.985); filter:brightness(.92); }
+#end-turn:focus-visible { outline:2px solid #f6d598; outline-offset:3px; }
+#end-turn::before,#end-turn::after { display:none; }
+@media (hover:hover) and (pointer:fine) { #end-turn:enabled:hover .v2-turn-core { filter:brightness(1.06); } }
+/* Static housing, rim and hitbox are intentionally outside the motion target. */
+.cd-private-back.cd-card-back { border:0; background:none; box-shadow:0 3px 10px #0006; }
+.cd-private-back.cd-card-back::before,.cd-private-back.cd-card-back::after { display:none; }
+.cd-private-back img, .flying-card img { width:100%; height:100%; object-fit:contain; pointer-events:none; }
+.flying-card { background:none; border:0; box-shadow:none; }
+.flying-card::before,.flying-card::after { display:none; }
 .stage07-utility-actions {
   position: fixed; top: max(7px, env(safe-area-inset-top)); right: max(150px, calc(env(safe-area-inset-right) + 145px));
   z-index: 90; pointer-events: auto;
@@ -148,17 +170,12 @@ body.stage04-hand-expanded .hand-dock { transform: translateY(-112px); }
 body.stage04-hand-expanded .stage04-hand-toggle::after { content: "⌄"; }
 body.cd-handoff-private .hand-row { visibility: hidden; }
 .status-toast { position: fixed; top: 7px; left: 8px; transform: none; max-width: 46vw; font-size: 10px; z-index: 80; pointer-events: none; }
-@media (orientation: portrait) {
-  /* Landscape is the authored gameplay view. Portrait remains usable for menus;
-     both sockets stay inside the visible image crop until the device rotates. */
-  [data-battlefield-anchor="shared-deck"] { left: calc(var(--view-left) + 53px); }
-  [data-battlefield-anchor="turn-actions"] { left: calc(var(--view-left) + var(--view-width) - 58px); }
-}
+/* Landscape is the authored gameplay view. Do not move individual sockets
+ * away from their baked housings in portrait. Tool/menu controls remain in screen space. */
 @media (prefers-reduced-motion: reduce) {
   .hand-dock, .hand-card, .board-slot { transition: none; }
-  #end-turn:active { transform: none; }
+  #end-turn:enabled:active .v2-turn-core { transform:none; }
+  .v2-turn-core,.v2-turn-light { transition:none; }
 }
 
 .session-private .hand-row { visibility: hidden; }
-
-.end-turn-label { font-size: max(13px, calc(11px / var(--world-scale, 1))); }
