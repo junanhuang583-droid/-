@@ -3,6 +3,8 @@ import { fresh, unit } from '../baseline-fixtures.js';
 import type { BasicGameSession } from '../../src/core/basic-game.js';
 import { HAND_DRAW } from '../../src/application/hand-draw.js';
 const KEY = 'lushizhizao.basic-game.v1';
+// Video is a worker-scoped option in Playwright; configure it at file scope.
+test.use({video:'on'});
 
 async function start(page: Page, oldCount = 3) {
   const s = fresh(); s.demoSpecialsAdded = true;
@@ -77,7 +79,6 @@ async function observe(page: Page) {
 }
 
 test.describe('3B-3 unmodified normal-speed batches',()=>{
-  test.use({video:'on'});
   for(const [width,height] of [[1536,691],[740,360]] as const){
     test(`each card lands in its real fan slot and reveals once ${width}x${height}`,async({page},info)=>{
       await page.setViewportSize({width,height});await start(page);await observe(page);
