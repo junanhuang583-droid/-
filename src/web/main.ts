@@ -1,3 +1,4 @@
+import { HandDrawView } from './hand-draw-view.js';
 import type { QueuedCard } from "../application/card-acquisition-queue.js";
 import { battlefieldBackground, deckView, turnView, heroView } from "./battlefield-view.js";
 import { HandoffView } from "./handoff-view.js";
@@ -35,6 +36,7 @@ let turnFlipAnimating = false;
 let turnFlipEpoch = 0;
 const turnMotion = new EndTurnMotion();
 const deckDrawMotion = new DeckDrawMotion();
+const handDrawView = new HandDrawView();
 const handoffView = new HandoffView(() => { void revealTurnWithFlip(); });
 const clickBound = new WeakSet<HTMLElement>();
 const markup = new WeakMap<HTMLElement, string>();
@@ -81,9 +83,9 @@ function render(): void {
   const state = session.state;
   const active = presentedPlayer;
   const opponent = otherPlayer(active);
-  const interactionLocked = openingDealActive || animationRunning || turnFlipAnimating;
+  const interactionLocked = openingDealActive || animationRunning || turnFlipAnimating || hiddenDrawCount > 0;
   const handPrivate = openingDealActive || session.handoffRequired || turnFlipAnimating;
-  setPresentationLocked(handPrivate || animationRunning || Boolean(state.winner));
+  setPresentationLocked(handPrivate || animationRunning || hiddenDrawCount > 0 || Boolean(state.winner));
   const turnState = deriveTurnControlState({ handoffRequired: session.handoffRequired,
     blocked: Boolean(state.winner || interactionLocked || hasPendingEffects(session)) });
 
@@ -141,7 +143,11 @@ function render(): void {
   hand.setAttribute("aria-hidden", String(handPrivate));
   hand.inert = presentationLocked();
   const handState = state.players[state.activePlayer];
-  replaceMarkup(hand, handPrivate ? "" : handState.hand.map((id, index) => handCard(id, index, handState.hand.length)).join("") || `<div class="empty-state">暂无手牌</div>`);
+  if (handPrivate) replaceMarkup(hand, "");
+  else {
+    syncHandRow(hand, handState.hand, state.activePlayer);
+    if (hiddenDrawCount > 0) handDrawView.mount(hand);
+  }
   const toggle = root.querySelector<HTMLButtonElement>(".stage04-hand-toggle")!;
   toggle.disabled = presentationLocked();
   toggle.querySelector("strong")!.textContent = String(handState.hand.length);
@@ -175,6 +181,33 @@ function replaceMarkup(element: HTMLElement, html: string): void {
   element.innerHTML = html;
   markup.set(element, html);
 }
+/** Retain actual hand buttons when a draw appends cards or releases its lock.
+ * Index+definition is only a render match, never a persistent card identity. */
+function syncHandRow(row: HTMLElement, hand: CardId[], player: PlayerId): void {
+  if (row.dataset.handPlayer !== player) row.replaceChildren();
+  row.dataset.handPlayer = player;
+  hand.forEach((id, index) => {
+    let element = row.children[index] as HTMLButtonElement | undefined;
+    if (!element?.matches('.hand-card') || element.dataset.cardId !== id) {
+      const template = document.createElement('template');
+      template.innerHTML = handCard(id, index);
+      const fresh = template.content.firstElementChild as HTMLButtonElement;
+      if (element) element.replaceWith(fresh); else row.append(fresh);
+      element = fresh;
+    }
+    const card = catalog.cards.get(id);
+    element.dataset.handIndex = String(index);
+    element.disabled = card?.health == null || card.attack == null || interactionBusy();
+    element.classList.toggle('selected', selectedHandIndex === index);
+    handDrawView.syncCard(element, index);
+  });
+  while (row.children.length > hand.length) row.lastElementChild!.remove();
+  if (!hand.length) row.innerHTML = '<div class="empty-state">暂无手牌</div>';
+  // Decorators own child markup. Always invalidate the empty/private cache so
+  // a later handoff cannot accidentally retain previously visible card faces.
+  markup.delete(row);
+}
+
 function hidePrivateHand(): void {
   const shell = root.querySelector<HTMLElement>(".game-shell");
   if (shell) { shell.classList.add("session-private"); shell.dataset.handPrivate = "true"; }
@@ -185,6 +218,7 @@ function hidePrivateHand(): void {
 }
 function discardFlyingCards(): void {
   deckDrawMotion.cancel();
+  handDrawView.clear();
   const layer = root.querySelector<HTMLElement>("#flying-card-layer");
   layer?.getAnimations({ subtree: true }).forEach(animation => animation.cancel());
   layer?.replaceChildren();
@@ -249,14 +283,13 @@ function boardSlot(
   `;
 }
 
-function handCard(cardId: CardId, index: number, handSize: number): string {
+function handCard(cardId: CardId, index: number): string {
   const card = catalog.cards.get(cardId);
-  if (!card) return `<button class="hand-card" disabled>${escapeHtml(cardId)}</button>`;
+  if (!card) return `<button class="hand-card" data-hand-index="${index}" data-card-id="${escapeHtml(cardId)}" disabled>${escapeHtml(cardId)}</button>`;
   const selected = selectedHandIndex === index;
   const unusable = card.health === null || card.attack === null;
-  const newlyDrawnHidden = hiddenDrawCount > 0 && index >= handSize - hiddenDrawCount;
   return `
-    <button class="hand-card ${selected ? "selected" : ""} ${newlyDrawnHidden ? "newly-drawn-hidden" : ""}" data-hand-index="${index}" data-card-id="${escapeHtml(cardId)}" ${unusable || interactionBusy() ? "disabled" : ""}>
+    <button class="hand-card ${selected ? "selected" : ""}" data-hand-index="${index}" data-card-id="${escapeHtml(cardId)}" ${unusable || interactionBusy() ? "disabled" : ""}>
       <span class="card-id">${escapeHtml(card.id)}</span>
       <div class="hand-card-art"><span>${escapeHtml(card.name.slice(0, 1))}</span></div>
       <strong>${escapeHtml(card.name)}</strong>
@@ -381,8 +414,9 @@ async function revealTurnWithFlip(): Promise<void> {
   }
   if (flipEpoch !== turnFlipEpoch) { render(); return; }
 
-  const drawnCards = acquisitionQueue.takeDraws(session.state.activePlayer, "turn-start")
+  let drawnCards = acquisitionQueue.takeDraws(session.state.activePlayer, "turn-start")
     .flatMap(batch => batch.cards);
+  if (!handDrawView.prepare(drawnCards, session.state.players[session.state.activePlayer].hand, session.state.activePlayer)) drawnCards = [];
   hiddenDrawCount = drawnCards.length;
   notice = `${playerLabel(session.state.activePlayer)}已接手。`;
   render();
@@ -406,7 +440,7 @@ async function playTurnFlip(epoch: number, reveal = false): Promise<boolean> {
     if (epoch === turnFlipEpoch) {
       // Cards were already drawn by the rule command. A discarded visual
       // transition must not start new cosmetic work in the background.
-      if (!completed) { hiddenDrawCount = 0; acquisitionQueue.clear(); }
+      if (!completed) { hiddenDrawCount = 0; acquisitionQueue.clear(); handDrawView.clear(); }
       if (reveal || !completed) presentedPlayer = readSession().state.activePlayer;
       turnFlipAnimating = false;
       render();
@@ -416,7 +450,7 @@ async function playTurnFlip(epoch: number, reveal = false): Promise<boolean> {
 }
 
 function interactionBusy(): boolean {
-  return animationRunning || turnFlipAnimating;
+  return animationRunning || turnFlipAnimating || hiddenDrawCount > 0;
 }
 
 function startNewGame(): void {
@@ -429,8 +463,8 @@ function startNewGame(): void {
   resetGame();
   session = readSession();
   presentedPlayer = session.state.activePlayer;
-  selectedAttackerId = null;
   selectedHandIndex = null;
+  selectedAttackerId = null;
   hiddenDrawCount = 0;
   openingDealActive = true;
   animationRunning = false;
@@ -480,35 +514,20 @@ async function playOpeningDeal(): Promise<void> {
   const active = session.state.activePlayer;
   const activeCards = opening.filter(batch => batch.acquisition.playerId === active).flatMap(batch => batch.cards);
   const opponentCards = opening.filter(batch => batch.acquisition.playerId !== active).flatMap(batch => batch.cards);
-  // Keep the existing recipient order. The source presenter serializes this
-  // pair; multi-card choreography and exact hand landing are later packages.
-  const openingCount = Math.max(activeCards.length, opponentCards.length);
-  for (let i = 0; i < openingCount; i += 1) {
-    const label = progress();
-    if (label) label.textContent = `初始手牌 ${i + 1} / ${openingCount}`;
-    if (epoch !== animationEpoch) return;
-    const results = await Promise.all([
-      opponentCards[i] ? flyCardTo(opponentTarget, "opponent", opponentCards[i]) : Promise.resolve(true),
-      activeCards[i] ? flyCardTo(activeTarget, "active", activeCards[i]) : Promise.resolve(true),
-    ]);
-    if (results.some(ok => !ok)) {
-      if (epoch !== animationEpoch) return;
-      acquisitionQueue.clear();
-      break;
-    }
+  // Keep private opening recipients, but use one staggered source batch instead
+  // of separate serial loops. Precise public/private opening staging is 3B-4.
+  const requests: import('./deck-draw-motion.js').DrawFlightRequest[] = [];
+  for (let i = 0; i < Math.max(activeCards.length, opponentCards.length); i++) {
+    if (opponentCards[i]) requests.push({ target: opponentTarget, kind: 'opponent', occurrenceId: opponentCards[i]!.id });
+    if (activeCards[i]) requests.push({ target: activeTarget, kind: 'active', occurrenceId: activeCards[i]!.id });
   }
-
+  const firstTurnCards = acquisitionQueue.takeDraws(active, 'turn-start').flatMap(batch => batch.cards);
+  requests.push(...firstTurnCards.map(card => ({ target: activeTarget, kind: 'draw' as const, occurrenceId: card.id })));
+  const label = progress();
+  if (label) label.textContent = `初始发牌与先手摸牌 · 共 ${requests.length} 张`;
+  const result = await deckDrawMotion.playBatch(requests);
   if (epoch !== animationEpoch) return;
-  const firstTurnCards = acquisitionQueue.takeDraws(active, "turn-start").flatMap(batch => batch.cards);
-  const firstTurnDraw = firstTurnCards.length;
-  if (firstTurnDraw > 0) {
-    const label = progress();
-    if (label) label.textContent = `先手摸牌 ${firstTurnDraw} 张`;
-    for (let i = 0; i < firstTurnDraw; i += 1) {
-      if (epoch !== animationEpoch) return;
-      if (!await flyCardTo(activeTarget, "draw", firstTurnCards[i])) break;
-    }
-  }
+  if (result !== 'completed') acquisitionQueue.clear();
 
   if (epoch !== animationEpoch) return;
   finishOpeningDeal();
@@ -519,38 +538,28 @@ async function playOpeningDeal(): Promise<void> {
 }
 
 async function playTurnDraw(cards: QueuedCard[]): Promise<void> {
-  const count = cards.length;
-  if (count <= 0 || animationRunning) {
-    hiddenDrawCount = 0;
-    render();
-    return;
-  }
+  if (!cards.length || animationRunning) return;
   animationRunning = true;
   const epoch = animationEpoch;
   render();
-  await wait(reducedMotion() ? 30 : 80);
-  const target = document.querySelector<HTMLElement>("#active-hand-target");
-  if (target) {
-    for (let i = 0; i < count; i += 1) {
-      if (epoch !== animationEpoch) return;
-      if (!await flyCardTo(target, "draw", cards[i])) break;
+  try {
+    // The same view-event pass applies card skins and the shared fan. Hidden new
+    // slots already reserve final room; old cards are moving there only once.
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    if (epoch !== animationEpoch) return;
+    const row = root.querySelector<HTMLElement>('#active-hand-target');
+    if (row) await deckDrawMotion.playBatch(handDrawView.requests(row));
+  } catch {
+    deckDrawMotion.cancel();
+  } finally {
+    if (epoch === animationEpoch) {
+      handDrawView.clear();
+      hiddenDrawCount = 0;
+      animationRunning = false;
+      notice = `${playerLabel(session.state.activePlayer)}摸了 ${cards.length} 张牌。`;
+      render();
     }
   }
-  if (epoch !== animationEpoch) return;
-  hiddenDrawCount = 0;
-  animationRunning = false;
-  notice = `${playerLabel(session.state.activePlayer)}摸了 ${count} 张牌。`;
-  render();
-}
-
-async function flyCardTo(
-  target: HTMLElement,
-  kind: "opponent" | "active" | "draw",
-  occurrence?: QueuedCard,
-): Promise<boolean> {
-  const result = await deckDrawMotion.play({ target, kind,
-    ...(occurrence ? { occurrenceId: occurrence.id } : {}) });
-  return result === "completed";
 }
 
 function winnerOverlay(winner: PlayerId | "draw"): string {

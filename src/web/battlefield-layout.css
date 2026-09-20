@@ -226,6 +226,11 @@ body.stage04-hand-expanded .hand-dock { transform: translateY(-112px); }
   transform: translateX(var(--stage04-focus-x,0px)) translateY(var(--ab-y,0px)) rotate(var(--ab-angle,0deg));
   z-index: var(--ab-z,1); transition: transform .15s ease, opacity .12s ease;
 }
+/* Draw batches keep real hand slots in the final fan. Only their reveal state
+ * changes; no hidden tail is repainted as one group at the end. */
+.hand-row[data-draw-batch="true"] .hand-card { transition:none; opacity:1; }
+.hand-row .hand-card[data-draw-state="pending"] { visibility:hidden; opacity:0; pointer-events:none; }
+.hand-row .hand-card[data-draw-state="revealing"] { visibility:visible; opacity:1; pointer-events:none; }
 .hand-row .hand-card:first-child { margin-left: 0; }
 .hand-row .hand-card:hover:not(:disabled) { transform: translateX(var(--stage04-focus-x,0px)) translateY(calc(var(--ab-y,0px) - 7px)) rotate(var(--ab-angle,0deg)); }
 .hand-row .hand-card.ab-touching, .hand-row .hand-card.selected, .hand-row .hand-card.prototype-selected {

@@ -139,7 +139,7 @@ test('R2 return remains visibly locked for the real pending draw, then lights sm
   const nearEnd=await pose(page,duration-1);
   expect(nearEnd.glow).toBeCloseTo(TURN_MOTION.blockedGlow,2);
   await expect(page.locator('#end-turn')).toBeDisabled();
-  await resume(page);await expect(page.locator('.flying-card')).toHaveCount(1);
+  await resume(page);await expect(page.locator('.flying-card').first()).toBeVisible();
   await expect(page.locator('#end-turn')).toBeDisabled();
   await expect(page.locator('#end-turn')).toBeEnabled();
   await expect.poll(async()=> (await pose(page)).glow).toBeCloseTo(1,3);

@@ -26,7 +26,7 @@ async function pauseAtBirth(page:Page){
   });
 }
 async function seek(page:Page,time:number){
-  await page.locator('.deck-draw-stage').evaluate((e,t)=>e.getAnimations({subtree:true}).forEach(a=>{a.currentTime=t;}),time);
+  await page.locator('.deck-draw-stage').first().evaluate((e,t)=>e.getAnimations({subtree:true}).forEach(a=>{a.currentTime=t;}),time);
   await page.evaluate(()=>new Promise<void>(r=>requestAnimationFrame(()=>r())));
 }
 async function shot(page:Page,info:TestInfo,name:string){
@@ -43,7 +43,7 @@ for(const [width,height] of [[1536,691],[740,360]] as const){
     // actual source rim after that commit, then require identity throughout flight.
     const rimHandle=await page.locator('.v2-deck-rim').elementHandle();
     const committed=await state(page);await pauseAtBirth(page);await page.locator('#reveal-turn').click();
-    const card=page.locator('.deck-draw-card');await expect(card).toBeVisible();await seek(page,0);
+    const card=page.locator('.deck-draw-card').first();await expect(card).toBeVisible();await seek(page,0);
     const projected=await card.evaluate((e,size)=>{
       const m=new DOMMatrixReadOnly(getComputedStyle(e).transform);
       return [[0,0],[size.w,0],[size.w,size.h],[0,size.h]].map(([x,y])=>{
@@ -93,7 +93,7 @@ for(const [width,height] of [[1536,691],[740,360]] as const){
     const sameCard=await card.elementHandle();await seek(page,DRAW_FLIGHT.exitMs);
     await expect(card).toHaveAttribute('data-draw-phase','flight');
     expect((await card.boundingBox())!.x).toBeGreaterThan(fixed!.x+fixed!.width);
-    await expect(page.locator('.v2-deck-slice:last-child')).toHaveCSS('visibility','visible');
+    // The following card may already own the extraction lease at this point.
     await shot(page,info,'fully-clear-full');await seek(page,240);await shot(page,info,'flight-full');
     expect(await page.locator('.v2-deck-rim').boundingBox()).toEqual(fixed);
     expect(await rimHandle!.evaluate(e=>e===document.querySelector('.v2-deck-rim'))).toBe(true);
@@ -101,18 +101,18 @@ for(const [width,height] of [[1536,691],[740,360]] as const){
     expect(await turn!.evaluate(e=>e.isConnected&&e===document.querySelector('.v2-turn-plate'))).toBe(true);
     expect((await state(page)).state).toEqual(committed.state);
     expect((await state(page)).revision).toBe((before.revision??0)+2);
-    await page.locator('.deck-draw-stage').evaluate(e=>e.getAnimations({subtree:true}).forEach(a=>a.cancel()));
+    await page.locator('.deck-draw-stage').evaluateAll(es=>es.forEach(e=>e.getAnimations({subtree:true}).forEach(a=>a.cancel())));
     await expect(page.locator('#end-turn')).toBeEnabled();await expect(page.locator('.deck-draw-stage')).toHaveCount(0);
   });
 }
 
-test('3B-2 full-game normal speed keeps one source owner and unchanged rule results',async({page},info)=>{
+test('3B-2 full-game normal speed keeps one extraction owner and bounded overlap and unchanged rule results',async({page},info)=>{
   await start(page);const before=await state(page);
   await page.evaluate(()=>{
-    const seen=new Set<Element>();const flights:{id:string;frames:number;exit:boolean;air:boolean}[]=[];let max=0;
-    Reflect.set(window,'__drawObserved',{flights,get max(){return max;}});
+    const seen=new Set<Element>();const flights:{id:string;frames:number;exit:boolean;air:boolean}[]=[];let max=0,maxExtracting=0;
+    Reflect.set(window,'__drawObserved',{flights,get max(){return max;},get maxExtracting(){return maxExtracting;}});
     const scan=()=>{
-      const cards=[...document.querySelectorAll<HTMLElement>('.deck-draw-card')];max=Math.max(max,cards.length);
+      const cards=[...document.querySelectorAll<HTMLElement>('.deck-draw-card')];max=Math.max(max,cards.length);maxExtracting=Math.max(maxExtracting,cards.filter(c=>c.dataset.drawPhase==='exit').length);
       cards.forEach(card=>{if(!seen.has(card)){seen.add(card);flights.push({id:card.dataset.acquisitionId!,frames:0,exit:false,air:false});}
         const f=flights.find(f=>f.id===card.dataset.acquisitionId)!;f.frames++;if(card.dataset.drawPhase==='exit')f.exit=true;else f.air=true;});
       requestAnimationFrame(scan);
@@ -120,8 +120,8 @@ test('3B-2 full-game normal speed keeps one source owner and unchanged rule resu
   });
   await page.locator('#end-turn').click();await expect(page.locator('#reveal-turn')).toBeVisible();
   const after=await state(page);await page.locator('#reveal-turn').click();await expect(page.locator('#end-turn')).toBeEnabled();
-  const observed=await page.evaluate(()=>Reflect.get(window,'__drawObserved') as {max:number;flights:{id:string;frames:number;exit:boolean;air:boolean}[]});
-  expect(observed.max).toBe(1);expect(observed.flights).toHaveLength(5);
+  const observed=await page.evaluate(()=>Reflect.get(window,'__drawObserved') as {max:number;maxExtracting:number;flights:{id:string;frames:number;exit:boolean;air:boolean}[]});
+  expect(observed.max).toBeGreaterThan(1);expect(observed.max).toBeLessThanOrEqual(3);expect(observed.maxExtracting).toBe(1);expect(observed.flights).toHaveLength(5);
   expect(new Set(observed.flights.map(f=>f.id)).size).toBe(5);
   expect(observed.flights.every(f=>f.frames>=3&&f.exit&&f.air)).toBe(true);
   expect((await state(page)).state).toEqual(after.state);expect((await state(page)).revision).toBe((before.revision??0)+2);

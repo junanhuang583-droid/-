@@ -3,7 +3,7 @@ import { MASTER_TO_WORLD, V2, type Rect } from './battlefield-v2.js';
 
 export interface Point { x: number; y: number }
 export type Quad = [Point, Point, Point, Point];
-export interface FlightTarget { center: Point; width: number; angle: number }
+export interface FlightTarget { center: Point; width: number; angle: number; via?: Point }
 /** Presentation geometry only. Time, pose and card size never change a rule. */
 export const DRAW_FLIGHT = { width: 82, exitMs: 135, travelMs: 235, exitAngle: -8 } as const;
 const full = assets.assets.find(a => a.id === 'card-back-final')!;
@@ -79,7 +79,19 @@ export function sampleDrawFlight(plan: DrawFlightPlan, ms: number): Quad {
       y: c.y+mix(p.y-start.y,rect[i]!.y-exit.y,shape) })) as Quad;
   }
   const t = clamp((ms-DRAW_FLIGHT.exitMs)/DRAW_FLIGHT.travelMs);
-  const c = bezier(exit, plus(exit,{x:tangent.x*DRAW_FLIGHT.travelMs/3,y:tangent.y*DRAW_FLIGHT.travelMs/3}),
+  let c: Point;
+  if (plan.target.via) {
+    // Hand-bound flights descend beside the hero before crossing the lower
+    // hand band. A shared tangent at the bend avoids flying through the portrait.
+    const via = plan.target.via, end = plan.target.center;
+    const first = Math.hypot(via.x-exit.x, via.y-exit.y), last = Math.hypot(end.x-via.x, end.y-via.y);
+    const split = Math.max(.45, Math.min(.82, first / (first+last)));
+    const one = DRAW_FLIGHT.travelMs*split, two = DRAW_FLIGHT.travelMs-one;
+    const vx = Math.max(.8, (first+last)/DRAW_FLIGHT.travelMs*.7);
+    if (t < split) c = bezier(exit, plus(exit,{x:tangent.x*one/3,y:tangent.y*one/3}),
+      plus(via,{x:-vx*one/3,y:0}), via, t/split);
+    else c = bezier(via, plus(via,{x:vx*two/3,y:0}), plus(end,{x:-Math.min(35,last/3),y:0}), end, (t-split)/(1-split));
+  } else c = bezier(exit, plus(exit,{x:tangent.x*DRAW_FLIGHT.travelMs/3,y:tangent.y*DRAW_FLIGHT.travelMs/3}),
     plus(plan.target.center,{x:-35,y:0}),plan.target.center,t);
   return rectangleQuad({ center:c, width:mix(plan.exit.width,plan.target.width,smooth(t)),
     angle:mix(plan.exit.angle,plan.target.angle,smooth(t)) });
