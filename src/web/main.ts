@@ -1,3 +1,4 @@
+import type { QueuedCard } from "../application/card-acquisition-queue.js";
 import { battlefieldBackground, deckView, turnView, heroView } from "./battlefield-view.js";
 import { HandoffView } from "./handoff-view.js";
 import { presentationLocked, setPresentationLocked } from "./presentation-lock.js";
@@ -14,7 +15,7 @@ import {
 import type { CardId } from "../model/cards.js";
 import type { MinionInstance, PlayerId } from "../model/state.js";
 import { catalog } from "./game-catalog.js";
-import { dispatchGame, finishOpeningDeal, persistenceWarning, readSession, resetGame, subscribeSession, wasSessionRestored } from "./session-runtime.js";
+import { acquisitionQueue, dispatchGame, finishOpeningDeal, persistenceWarning, readSession, resetGame, subscribeSession, wasSessionRestored } from "./session-runtime.js";
 import "./styles.css";
 import { publishViewRendered } from "./view-events.js";
 
@@ -27,7 +28,6 @@ let session: BasicGameSession = readSession();
 let presentedPlayer: PlayerId = session.state.activePlayer;
 let selectedHandIndex: number | null = null;
 let selectedAttackerId: string | null = null;
-let pendingTurnDrawCount = 0;
 let hiddenDrawCount = 0;
 let openingDealActive = restoredSession === null;
 let animationRunning = false;
@@ -49,7 +49,6 @@ subscribeSession((reason) => {
   if (reason === "external" || reason === "new-game" || session.state.winner) {
     animationEpoch += 1;
     discardFlyingCards();
-    pendingTurnDrawCount = 0;
     hiddenDrawCount = 0;
     openingDealActive = false;
     animationRunning = false;
@@ -344,8 +343,6 @@ async function endTurnWithFlip(): Promise<void> {
   setPresentationLocked(true);
   hidePrivateHand();
   const flipEpoch = ++turnFlipEpoch;
-  const next = otherPlayer(session.state.activePlayer);
-  const handBefore = session.state.players[next].hand.length;
   const error = dispatchGame({ type: "end-turn" });
   session = readSession();
 
@@ -356,7 +353,6 @@ async function endTurnWithFlip(): Promise<void> {
   }
   if (flipEpoch !== turnFlipEpoch) { render(); return; }
 
-  pendingTurnDrawCount = Math.max(0, session.state.players[next].hand.length - handBefore);
   selectedAttackerId = null;
   selectedHandIndex = null;
   notice = "回合结束，进入交接。";
@@ -383,14 +379,14 @@ async function revealTurnWithFlip(): Promise<void> {
   }
   if (flipEpoch !== turnFlipEpoch) { render(); return; }
 
-  const drawCount = pendingTurnDrawCount;
-  pendingTurnDrawCount = 0;
-  hiddenDrawCount = drawCount;
+  const drawnCards = acquisitionQueue.takeDraws(session.state.activePlayer, "turn-start")
+    .flatMap(batch => batch.cards);
+  hiddenDrawCount = drawnCards.length;
   notice = `${playerLabel(session.state.activePlayer)}已接手。`;
   render();
   const completed = await playTurnFlip(flipEpoch, true);
   if (flipEpoch !== turnFlipEpoch) return;
-  if (completed && drawCount > 0) void playTurnDraw(drawCount);
+  if (completed && drawnCards.length > 0) void playTurnDraw(drawnCards);
 }
 
 async function playTurnFlip(epoch: number, reveal = false): Promise<boolean> {
@@ -408,7 +404,7 @@ async function playTurnFlip(epoch: number, reveal = false): Promise<boolean> {
     if (epoch === turnFlipEpoch) {
       // Cards were already drawn by the rule command. A discarded visual
       // transition must not start new cosmetic work in the background.
-      if (!completed) hiddenDrawCount = 0;
+      if (!completed) { hiddenDrawCount = 0; acquisitionQueue.clear(); }
       if (reveal || !completed) presentedPlayer = readSession().state.activePlayer;
       turnFlipAnimating = false;
       render();
@@ -433,7 +429,6 @@ function startNewGame(): void {
   presentedPlayer = session.state.activePlayer;
   selectedAttackerId = null;
   selectedHandIndex = null;
-  pendingTurnDrawCount = 0;
   hiddenDrawCount = 0;
   openingDealActive = true;
   animationRunning = false;
@@ -466,35 +461,45 @@ async function playOpeningDeal(): Promise<void> {
   animationRunning = true;
   const epoch = animationEpoch;
   await wait(reducedMotion() ? 40 : 180);
+  if (epoch !== animationEpoch) return;
 
   const progress = () => document.querySelector<HTMLElement>("#deal-progress");
   const opponentTarget = document.querySelector<HTMLElement>(".opponent-hero");
   const activeTarget = document.querySelector<HTMLElement>("#active-hand-target");
   if (!opponentTarget || !activeTarget) {
+    acquisitionQueue.clear();
     openingDealActive = false;
     animationRunning = false;
     render();
     return;
   }
 
-  const openingCount = 8;
+  const opening = acquisitionQueue.takeDraws(undefined, "opening-hand");
+  const active = session.state.activePlayer;
+  const activeCards = opening.filter(batch => batch.acquisition.playerId === active).flatMap(batch => batch.cards);
+  const opponentCards = opening.filter(batch => batch.acquisition.playerId !== active).flatMap(batch => batch.cards);
+  // Preserve the existing paired presentation for now; counts/occurrences come
+  // from actual rule results, even when one recipient received fewer cards.
+  const openingCount = Math.max(activeCards.length, opponentCards.length);
   for (let i = 0; i < openingCount; i += 1) {
     const label = progress();
     if (label) label.textContent = `初始手牌 ${i + 1} / ${openingCount}`;
     if (epoch !== animationEpoch) return;
     await Promise.all([
-      flyCardTo(opponentTarget, i, openingCount, "opponent"),
-      flyCardTo(activeTarget, i, openingCount, "active"),
+      opponentCards[i] ? flyCardTo(opponentTarget, i, opponentCards.length, "opponent", opponentCards[i]) : Promise.resolve(),
+      activeCards[i] ? flyCardTo(activeTarget, i, activeCards.length, "active", activeCards[i]) : Promise.resolve(),
     ]);
   }
 
-  const firstTurnDraw = Math.max(0, session.state.players[session.state.activePlayer].hand.length - openingCount);
+  if (epoch !== animationEpoch) return;
+  const firstTurnCards = acquisitionQueue.takeDraws(active, "turn-start").flatMap(batch => batch.cards);
+  const firstTurnDraw = firstTurnCards.length;
   if (firstTurnDraw > 0) {
     const label = progress();
     if (label) label.textContent = `先手摸牌 ${firstTurnDraw} 张`;
     for (let i = 0; i < firstTurnDraw; i += 1) {
       if (epoch !== animationEpoch) return;
-      await flyCardTo(activeTarget, i, firstTurnDraw, "draw");
+      await flyCardTo(activeTarget, i, firstTurnDraw, "draw", firstTurnCards[i]);
     }
   }
 
@@ -506,7 +511,8 @@ async function playOpeningDeal(): Promise<void> {
   render();
 }
 
-async function playTurnDraw(count: number): Promise<void> {
+async function playTurnDraw(cards: QueuedCard[]): Promise<void> {
+  const count = cards.length;
   if (count <= 0 || animationRunning) {
     hiddenDrawCount = 0;
     render();
@@ -520,7 +526,7 @@ async function playTurnDraw(count: number): Promise<void> {
   if (target) {
     for (let i = 0; i < count; i += 1) {
       if (epoch !== animationEpoch) return;
-      await flyCardTo(target, i, count, "draw");
+      await flyCardTo(target, i, count, "draw", cards[i]);
     }
   }
   if (epoch !== animationEpoch) return;
@@ -535,6 +541,7 @@ async function flyCardTo(
   index: number,
   total: number,
   kind: "opponent" | "active" | "draw",
+  occurrence?: QueuedCard,
 ): Promise<void> {
   const source = document.querySelector<HTMLElement>("#deck-source");
   const layer = document.querySelector<HTMLElement>("#flying-card-layer");
@@ -544,6 +551,9 @@ async function flyCardTo(
   const targetRect = target.getBoundingClientRect();
   const card = document.createElement("div");
   card.className = `flying-card flying-card-${kind}`;
+  // Opaque occurrence identity supports exact-once tracing without exposing a
+  // private card definition in the face-down DOM.
+  if (occurrence) card.dataset.acquisitionId = occurrence.id;
   card.innerHTML = `<img src="${v2Asset("card-back-final")}" alt="" draggable="false" />`;
   layer.append(card);
 
