@@ -47,9 +47,11 @@ for(const [width,height] of [[1536,691],[740,360]] as const){
         const p=new DOMPoint(x,y).matrixTransform(m);return {x:p.x/p.w,y:p.y/p.w};
       });
     },{w:DRAW_FLIGHT.width,h:DRAW_FLIGHT_HEIGHT});
+    // CSSOM serializes matrix coefficients with finite precision. Keep the
+    // browser bound below 0.02 authored pixels; pure homography tests enforce 1e-8.
     for(let i=0;i<4;i++){
-      expect(projected[i]!.x).toBeCloseTo(DECK_DRAW_QUAD[i]!.x,2);
-      expect(projected[i]!.y).toBeCloseTo(DECK_DRAW_QUAD[i]!.y,2);
+      expect(Math.abs(projected[i]!.x-DECK_DRAW_QUAD[i]!.x)).toBeLessThan(.02);
+      expect(Math.abs(projected[i]!.y-DECK_DRAW_QUAD[i]!.y)).toBeLessThan(.02);
     }
     await expect(page.locator('.v2-deck-slice:last-child')).toHaveCSS('visibility','hidden');
     await expect(card).toHaveCSS('opacity','1');await expect(page.locator('.v2-deck-rim')).toHaveCount(1);
@@ -81,8 +83,10 @@ for(const [width,height] of [[1536,691],[740,360]] as const){
     const exposed=await shot(page,info,'diagnostic-rim-hidden-full');
     await page.locator('.v2-deck-rim').evaluate(e=>(e as HTMLElement).style.removeProperty('visibility'));
     const delta=(a:typeof covered,b:typeof covered)=>samples.reduce((n,p)=>n+a.rgb(p.x,p.y).reduce((v,c,i)=>v+Math.abs(c-b.rgb(p.x,p.y)[i]!),0),0)/(samples.length*3);
-    expect(delta(covered,bare)).toBeLessThan(2);
-    expect(delta(covered,exposed)).toBeGreaterThan(8);
+    const metrics={samples:samples.length,coveredVsBare:delta(covered,bare),coveredVsExposed:delta(covered,exposed)};
+    await info.attach('opaque-rim-pixel-attribution',{body:JSON.stringify(metrics),contentType:'application/json'});
+    expect(metrics.coveredVsBare).toBeLessThan(2);
+    expect(metrics.coveredVsExposed).toBeGreaterThan(8);
     const sameCard=await card.elementHandle();await seek(page,DRAW_FLIGHT.exitMs);
     await expect(card).toHaveAttribute('data-draw-phase','flight');
     expect((await card.boundingBox())!.x).toBeGreaterThan(fixed!.x+fixed!.width);
