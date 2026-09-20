@@ -3,6 +3,7 @@ import "./attack-drag.js";
 import "./battlefield-layer.js";
 import "./effects-ui.js";
 import "./end-turn-view.js";
+import "./turn-socket-repair.js";
 import "./foundation-ab-v2.js";
 import "./foundation-cd.js";
 import "./main.js";

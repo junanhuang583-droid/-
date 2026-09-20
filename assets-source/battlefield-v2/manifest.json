@@ -1,5 +1,5 @@
 {
-  "version": "v2-3a1-adcd3eb725ed",
+  "version": "v2-3a1-739a1b31500c",
   "design": [
     1152,
     648
@@ -430,8 +430,27 @@
       ],
       "transport": "extra/turn-core-back.webp",
       "note": "Approved Stage 2B B3 flip-back panel, isolated onto the existing 196x96 turn-core canvas. 3A-1 wires the asset only; no flip state or animation yet."
+    },
+    {
+      "id": "turn-socket-lower-clean",
+      "file": "turn-socket-lower-clean.webp",
+      "source": "battlefield-v2-clean.webp",
+      "width": 316,
+      "height": 63,
+      "bytes": 2706,
+      "sha256": "739a1b31500cf4d722dc0b32dce8fb470fe9d7b02baf7741be9fb68664a8ee2a",
+      "alpha": true,
+      "regionId": "T1-lower-socket-repair",
+      "worldRect": [
+        974,
+        308,
+        158,
+        31.5
+      ],
+      "transport": "extra/turn-socket-lower-clean.webp",
+      "note": "Localized non-generative cavity-texture repair of a stationary old face bevel. See lower-socket-repair.json. Original battlefield, B3, front, rim and motion remain unchanged."
     }
   ],
-  "revision": "3a1-turn-flip-resource-wiring",
-  "note": "3A-1: approved B3 turn-core back face is checksum-registered and preloaded alongside the existing front/light/rim. Visual state remains front-only until 3A-2."
+  "revision": "3a-lower-socket-residue-fix",
+  "note": "Post-R5 local correction of the old lower face bevel remaining in the fixed socket texture. R1 crop, R2 motion, R3 handoff and all original asset bytes are preserved."
 }
