@@ -1,0 +1,9 @@
+/* Only this source-derived texture is positioned. The world, housing, hitbox
+ * and physical plate keep their existing geometry and stacking contexts. */
+.v2-turn-socket-repair {
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  visibility: hidden;
+}
+.v2-turn-socket-repair.is-decoded { visibility: visible; }

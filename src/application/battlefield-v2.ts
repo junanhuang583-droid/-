@@ -14,6 +14,9 @@ export const V2 = {
   count: sourceRect(76,495,100,38),
   housing: sourceRect(1368,338,296,194),
   core: sourceRect(1430,384,196,96),
+  // Exact crop in the existing 2304x1296 exported background, converted to world.
+  // A fixed cavity repair, never part of the rotating plate or the input box.
+  socketLowerRepair: { x: 1948 / 2, y: 616 / 2, width: 316 / 2, height: 63 / 2 },
   turnInput: sourceRect(1416,376,224,112),
   opponentHero: sourceRect(686,4,299,278),
   activeHero: sourceRect(690,610,308,294),
