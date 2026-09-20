@@ -22,7 +22,7 @@
 
 ## Scope and stop
 
-Current authorization extends through R2 only. R3 handoff flow, R4 final acceptance and R5 publication remain separate work packages. Existing rule/state/command ownership must not change.
+Current authorization extends through R3 only. R4 final acceptance and R5 publication remain separate work packages. Existing rule/state/command ownership must not change.
 
 The user does not need intermediate bundles or file deliveries, and will inspect the actual result after R5. Internal visual and regression checks still apply at each step. Do not merge or publish this branch before the repair is complete.
 
@@ -39,3 +39,17 @@ The user does not need intermediate bundles or file deliveries, and will inspect
 - Updated implementation-coupled legacy tests to sample the named plate rotation rather than whichever carrier animation is returned first. Added pure trajectory checks and full-game optical, native press, cancellation, preference-change, real draw-lock and ten-turn unmodified playback checks.
 - Local development checks use an offline full-application preview with asset URLs/in-memory storage adapted because this runtime cannot install npm packages or open local HTTP. They are preparatory only. Final locked-dependency production CI and its full-game screenshots must be reviewed before reporting R2 complete.
 - No intermediate packages are delivered to the user. Main and Pages remain on the released baseline. Stop before R3.
+
+
+## R3: stable public presentation and private hot-seat handoff
+
+- R2 recovery commit: `cb2728b041348459cd0be09a3c01c8c1e0a349c1`. The source archive from its successful CI artifact was restored; its full tree matched `f4d5ed29056315373ac03ab3604253c72ab6fc41` before editing.
+- The shell, design plane, background, end-turn button/core/plate/rim, public-view wrapper and hand dock are now mounted once. Dynamic regions update separately; unchanged markup is retained and handlers bind once. A public-view update cannot restart the plate's running timeline.
+- Only the viewing player identity is transient. Ending a turn commits immediately but holds the previous public orientation during the outgoing flip and waiting phase. All values still render from the authoritative snapshot. On reveal, a 75 ms fade-out / 105 ms fade-in changes the public orientation at the invisible midpoint while the independent plate continues rotating.
+- The old dark blurred handoff overlay is replaced by a compact native modal dialog with a fully transparent backdrop. The right-hand back face stays visible. Native modal exclusion blocks pointer and keyboard access to background UI; heading-first focus, repeat-key rejection, a focus loop and non-dismissable Escape prevent accidental next-player activation.
+- Private hand-card DOM and hidden log details are removed synchronously at handoff start, not after animation. Gesture/inspector/special-preview/sacrifice UI owners receive one transient presentation-lock notification and clear their own state. Synthetic background interaction cannot bypass these UI guards. Private cards only return after successful reveal presentation or authoritative interruption recovery.
+- Public side styling and control badges follow the presented orientation, not the prematurely advanced active player. The public units stay legible while inert. Rule state, targeting, commands, persistence, asset bytes, geometry, R2 motion parameters and deployment workflows are unchanged.
+- External/new-game/terminal updates invalidate old presentation work and cancel residual flight nodes. Reload and reduced-motion interruption converge to the latest session without writing optical state or repeating commands.
+- Added nine full-application browser checks: stable-node/clear-backdrop/private-hand checks at 1536x691 and 740x360; keyboard focus; same-task preview/gesture cleanup; shield bypass attempts; real cross-tab interruption; reload; reduced motion; and a real pending-effect picker after modal close.
+- Development checks were performed in the adapted offline full-application preview because this runtime cannot install the pinned npm dependencies or open local HTTP. They are provisional; production CI results and actual full-game screenshots must be reviewed and recorded on PR #3 before declaring R3 complete.
+- No intermediate user packages, 3B work, merge, or Pages publication. Stop before R4.

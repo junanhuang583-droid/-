@@ -1,3 +1,4 @@
+import { presentationLocked, onPresentationLock } from "./presentation-lock.js";
 import { PROTOTYPE_SPECIAL_BY_ID } from "../data/prototype-special-cards.js";
 import type { CardId } from "../model/cards.js";
 import "./prototype-special-cards.css";
@@ -8,6 +9,7 @@ let scheduled = false;
 let selectedSpecialIndex: number | null = null;
 
 
+onPresentationLock(() => { selectedSpecialIndex = null; removePreview(); });
 onViewRendered(sync, 20);
 document.addEventListener("click", onDocumentClick, true);
 scheduleSync();
@@ -23,7 +25,7 @@ function scheduleSync(): void {
 
 function sync(): void {
   const session = readSession();
-  if (!session) {
+  if (presentationLocked() || !session) {
     removePreview();
     return;
   }
@@ -58,7 +60,7 @@ function decorateSpecialCards(hand: CardId[]): void {
     if (!definition) return;
 
     const state = readSession();
-    button.disabled = state.handoffRequired || Boolean(state.state.winner) || Boolean(document.querySelector(".opening-deal, .draw-animating"));
+    button.disabled = presentationLocked() || state.handoffRequired || Boolean(state.state.winner) || Boolean(document.querySelector(".opening-deal, .draw-animating"));
     button.dataset.prototypeHandIndex = String(index);
     button.dataset.prototypeCardId = definition.id;
     button.classList.add(
@@ -79,6 +81,7 @@ function decorateSpecialCards(hand: CardId[]): void {
 }
 
 function onDocumentClick(event: MouseEvent): void {
+  if (presentationLocked()) return;
   const target = event.target;
   if (!(target instanceof Element)) return;
 

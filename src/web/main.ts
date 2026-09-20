@@ -1,8 +1,10 @@
 import { battlefieldBackground, deckView, turnView, heroView } from "./battlefield-view.js";
+import { HandoffView } from "./handoff-view.js";
+import { presentationLocked, setPresentationLocked } from "./presentation-lock.js";
+import { turnControlAriaLabel, turnControlDisabled, turnFace } from "../application/turn-control-state.js";
 import { deriveTurnControlState } from "../application/turn-control-state.js";
 import { EndTurnMotion } from "./end-turn-motion.js";
 import { syncEndTurnArt } from "./end-turn-view.js";
-import type { TurnPose } from "../application/turn-motion.js";
 import { v2Asset } from "../application/battlefield-v2.js";
 import {
   canMinionAttack,
@@ -22,6 +24,7 @@ const root: HTMLDivElement = appRoot;
 
 const restoredSession = wasSessionRestored ? readSession() : null;
 let session: BasicGameSession = readSession();
+let presentedPlayer: PlayerId = session.state.activePlayer;
 let selectedHandIndex: number | null = null;
 let selectedAttackerId: string | null = null;
 let pendingTurnDrawCount = 0;
@@ -31,6 +34,9 @@ let animationRunning = false;
 let turnFlipAnimating = false;
 let turnFlipEpoch = 0;
 const turnMotion = new EndTurnMotion();
+const handoffView = new HandoffView(() => { void revealTurnWithFlip(); });
+const clickBound = new WeakSet<HTMLElement>();
+const markup = new WeakMap<HTMLElement, string>();
 let notice = restoredSession
   ? "已恢复上次对局。新对局将启用扩展演示牌池。"
   : "新对局准备中：洗牌并发初始手牌。";
@@ -40,20 +46,26 @@ subscribeSession((reason) => {
   session = readSession();
   selectedAttackerId = null;
   selectedHandIndex = null;
-  if (reason === "external") {
+  if (reason === "external" || reason === "new-game" || session.state.winner) {
     animationEpoch += 1;
+    discardFlyingCards();
     pendingTurnDrawCount = 0;
     hiddenDrawCount = 0;
     openingDealActive = false;
     animationRunning = false;
     turnFlipEpoch += 1;
     turnMotion.cancel();
+    handoffView.cancelPublic();
+    presentedPlayer = session.state.activePlayer;
     turnFlipAnimating = false;
-    notice = "已同步另一窗口中的对局。";
+    if (reason === "external") notice = "已同步另一窗口中的对局。";
   }
   // A committed end-turn/reveal renders through the flip presenter. Suppress
   // the normal command render so it cannot replace the core mid-animation.
   if (turnFlipAnimating && reason === "command") return;
+  // Privacy and gesture cancellation apply in this same notification, not next frame.
+  setPresentationLocked(session.handoffRequired || turnFlipAnimating || openingDealActive || animationRunning || Boolean(session.state.winner));
+  if (session.handoffRequired) hidePrivateHand();
   if (sessionRenderQueued) return;
   sessionRenderQueued = true;
   queueMicrotask(() => { sessionRenderQueued = false; render(); });
@@ -63,117 +75,127 @@ let animationEpoch = 0;
 render();
 if (openingDealActive) void playOpeningDeal();
 
-function render(turnOrigin?: TurnPose | null): void {
-  // Carry only the optical pose across the existing render, not another game state.
-  // Stable public-board/overlay mounting is deliberately reserved for R3.
-  const carriedPose = turnOrigin ?? turnMotion.capture();
+function render(): void {
+  const carriedPose = turnMotion.capture();
   session = readSession();
   const state = session.state;
-  const active = state.activePlayer;
+  const active = presentedPlayer;
   const opponent = otherPlayer(active);
-  const activeState = state.players[active];
   const interactionLocked = openingDealActive || animationRunning || turnFlipAnimating;
+  const handPrivate = openingDealActive || session.handoffRequired || turnFlipAnimating;
+  setPresentationLocked(handPrivate || animationRunning || Boolean(state.winner));
+  const turnState = deriveTurnControlState({ handoffRequired: session.handoffRequired,
+    blocked: Boolean(state.winner || interactionLocked || hasPendingEffects(session)) });
 
-  root.innerHTML = `
-    <main class="game-shell ${session.handoffRequired ? "session-private" : ""} ${openingDealActive ? "opening-deal" : ""} ${hiddenDrawCount > 0 ? "draw-animating" : ""}">
-      <header class="game-topbar">
-        <div class="brand-block">
-          <strong>Card Game</strong>
-          <span>基础验收版</span>
-        </div>
-        <div class="top-stats">
-          <span>第 ${state.turn} 回合</span>
-          <span>${catalog.playableUniqueCards} 种演示随从</span>
-          <span class="save-pill">● 自动保存</span>
-        </div>
-      </header>
-
-      <section class="status-toast ${notice ? "show" : ""}">${escapeHtml(persistenceWarning() || notice)}</section>
-
-          <div class="stage07-utility-actions" data-battlefield-anchor="utility-actions">
-            <button class="secondary-button" data-new-game="confirm" ${interactionLocked ? "disabled" : ""}>新对局</button>
-          </div>
-
+  if (!root.querySelector(".game-shell")) {
+    root.innerHTML = `<main class="game-shell">
+      <header class="game-topbar"><div class="brand-block"><strong>Card Game</strong><span>基础验收版</span></div><div class="top-stats"></div></header>
+      <section class="status-toast"></section>
+      <div class="stage07-utility-actions" data-battlefield-anchor="utility-actions"><button class="secondary-button" data-new-game="confirm">新对局</button></div>
       <section class="battlefield-viewport" aria-label="战场">
         <div class="battlefield-coordinate-layer" data-battlefield-design="1152x648" data-stage07-lock="battlefield-v2-2d3">
           ${battlefieldBackground()}
           <div class="battlefield-future-anchor" data-battlefield-anchor="discard-future" aria-hidden="true"></div>
           <section class="battle-shell">
-        ${heroPanel(opponent, false)}
-        ${boardZone(opponent, false)}
-
-        <section class="scene-lane" data-battlefield-anchor="scene">
-          <div class="scene-placeholder">
-            <span class="scene-label">场景</span>
-            <small>${selectedAttackerId ? `已选择攻击者，点击敌方随从或${playerLabel(opponent)}英雄` : ""}</small>
-          </div>
-        </section>
-
-        ${heroPanel(active, true)}
-        ${boardZone(active, true)}
-
-        <aside class="battle-rail" data-battlefield-anchor="right-rail">
-          ${deckView(state.sharedDeck.length)}
-          ${turnView(deriveTurnControlState({
-            handoffRequired: session.handoffRequired,
-            blocked: Boolean(state.winner || interactionLocked || hasPendingEffects(session)),
-          }))}
-        </aside>
-      </section>
-
-      <section class="hand-dock" data-battlefield-anchor="hand-dock">
-        <button class="stage04-hand-toggle" type="button" aria-expanded="false">
-          <span>手牌</span><strong>${activeState.hand.length}</strong>
-        </button>
-        <div class="hand-heading">
-          <strong>${playerLabel(active)}手牌</strong>
-          <span>${activeState.hand.length} 张</span>
-          <small>点手牌 → 点己方空位召唤　｜　点己方随从 → 点敌方目标攻击</small>
-        </div>
-        <div class="hand-row" id="active-hand-target">
-          ${activeState.hand.map((cardId, index) => handCard(cardId, index, activeState.hand.length)).join("") || `<div class="empty-state">暂无手牌</div>`}
+            <div id="public-battle-view" class="public-battle-view" tabindex="-1" aria-label="公共战场"></div>
+            <aside class="battle-rail" data-battlefield-anchor="right-rail"><div id="deck-view-mount">${deckView(state.sharedDeck.length)}</div>${turnView(turnState)}</aside>
+          </section>
+          <section class="hand-dock" data-battlefield-anchor="hand-dock">
+            <button class="stage04-hand-toggle" type="button" aria-expanded="false"><span>手牌</span><strong></strong></button>
+            <div class="hand-row" id="active-hand-target"></div>
+          </section>
         </div>
       </section>
-        </div>
-      </section>
-
-      <details class="debug-drawer">
-        <summary>测试信息</summary>
-        <div class="debug-content">
-          <div class="mode-note">当前支持基础战斗、献祭、部分关键词与明确亡语。进化、装备、场景与AI尚未实现；并非全部卡牌技能都可执行。演示牌池会让所有“生命与攻击已明确”的正式随从至少出现1张；数量未确认的卡只在本演示牌池临时按1张使用，不写回正式记录。</div>
-          <div class="debug-stats">
-            <span>演示牌池 ${catalog.playableUniqueCards} 种 / ${catalog.playableDeckSize} 张</span>
-            <span>死亡记录 ${state.deathLog.length}</span>
-            <span>保存 ${formatTime(session.updatedAt)}</span>
-          </div>
-          <div class="log-list">
-            ${session.log.slice().reverse().map((entry) => `<div class="log-entry"><span>R${entry.turn}</span>${escapeHtml(entry.text)}</div>`).join("")}
-          </div>
-        </div>
-      </details>
-
+      <details class="debug-drawer"><summary>测试信息</summary><div class="debug-content"></div></details>
       <div id="flying-card-layer" class="flying-card-layer" aria-hidden="true"></div>
-      ${openingDealActive ? openingDealOverlay() : ""}
-      ${!openingDealActive && session.handoffRequired && !state.winner && !turnFlipAnimating ? handoffOverlay(active) : ""}
-      ${!openingDealActive && state.winner ? winnerOverlay(state.winner) : ""}
-    </main>
-  `;
+      <div id="session-overlay-mount"></div>
+    </main>`;
+  }
+  const shell = root.querySelector<HTMLElement>(".game-shell")!;
+  shell.dataset.viewPlayer = presentedPlayer;
+  shell.dataset.handPrivate = String(handPrivate);
+  shell.classList.toggle("session-private", handPrivate);
+  shell.classList.toggle("opening-deal", openingDealActive);
+  shell.classList.toggle("draw-animating", hiddenDrawCount > 0);
+  shell.dataset.presentationLocked = String(presentationLocked());
+  const toast = root.querySelector<HTMLElement>(".status-toast")!;
+  toast.textContent = persistenceWarning() || notice;
+  toast.classList.toggle("show", Boolean(toast.textContent));
+  root.querySelector<HTMLButtonElement>('[data-new-game="confirm"]')!.disabled = interactionLocked;
+  replaceMarkup(root.querySelector<HTMLElement>(".top-stats")!, `<span>第 ${state.turn} 回合</span><span>${catalog.playableUniqueCards} 种演示随从</span><span class="save-pill">● 自动保存</span>`);
+  const publicView = root.querySelector<HTMLElement>("#public-battle-view")!;
+  publicView.dataset.viewPlayer = active;
+  publicView.inert = presentationLocked();
+  replaceMarkup(publicView, `${heroPanel(opponent, false)}${boardZone(opponent, false)}
+    <section class="scene-lane" data-battlefield-anchor="scene"><div class="scene-placeholder">
+      <span class="scene-label">场景</span><small>${selectedAttackerId ? `已选择攻击者，点击敌方随从或${playerLabel(opponent)}英雄` : ""}</small>
+    </div></section>${heroPanel(active, true)}${boardZone(active, true)}`);
+  publicView.querySelectorAll<HTMLElement>(".v2-hero-status").forEach(e => {
+    const owner = e.closest<HTMLElement>(".hero-panel")!.dataset.owner as PlayerId;
+    e.textContent = session.handoffRequired || turnFlipAnimating ? "交接中"
+      : `${owner === state.activePlayer ? "当前回合" : "等待"} · 手牌 ${state.players[owner].hand.length}`;
+  });
+  replaceMarkup(root.querySelector<HTMLElement>("#deck-view-mount")!, deckView(state.sharedDeck.length));
 
-  bindEvents();
-  const turnButton = document.querySelector<HTMLButtonElement>("#end-turn");
+  const hand = root.querySelector<HTMLElement>("#active-hand-target")!;
+  hand.setAttribute("aria-hidden", String(handPrivate));
+  hand.inert = presentationLocked();
+  const handState = state.players[state.activePlayer];
+  replaceMarkup(hand, handPrivate ? "" : handState.hand.map((id, index) => handCard(id, index, handState.hand.length)).join("") || `<div class="empty-state">暂无手牌</div>`);
+  const toggle = root.querySelector<HTMLButtonElement>(".stage04-hand-toggle")!;
+  toggle.disabled = presentationLocked();
+  toggle.querySelector("strong")!.textContent = String(handState.hand.length);
+  // Hidden logs contain card names too; omit private details throughout handoff.
+  replaceMarkup(root.querySelector<HTMLElement>(".debug-content")!, handPrivate ? "" : `
+    <div class="mode-note">当前支持基础战斗、献祭、部分关键词与明确亡语。进化、装备、场景与AI尚未实现；并非全部卡牌技能都可执行。演示牌池中数量未确认的卡临时按1张使用，不写回正式记录。</div>
+    <div class="debug-stats"><span>演示牌池 ${catalog.playableUniqueCards} 种 / ${catalog.playableDeckSize} 张</span><span>死亡记录 ${state.deathLog.length}</span><span>保存 ${formatTime(session.updatedAt)}</span></div>
+    <div class="log-list">${session.log.slice().reverse().map(entry => `<div class="log-entry"><span>R${entry.turn}</span>${escapeHtml(entry.text)}</div>`).join("")}</div>`);
+  replaceMarkup(root.querySelector<HTMLElement>("#session-overlay-mount")!, openingDealActive ? openingDealOverlay() : state.winner ? winnerOverlay(state.winner) : "");
+
+  const turnButton = root.querySelector<HTMLButtonElement>("#end-turn")!;
+  turnButton.dataset.turnState = turnState;
+  turnButton.closest<HTMLElement>(".v2-turn")!.dataset.turnState = turnState;
+  turnButton.disabled = turnControlDisabled(turnState);
+  turnButton.setAttribute("aria-label", turnControlAriaLabel(turnState));
+  turnButton.querySelector<HTMLElement>(".v2-turn-core")!.dataset.turnFace = turnFace(turnState);
+  turnButton.querySelectorAll<HTMLElement>("[data-turn-face-panel]").forEach(e => e.setAttribute("aria-hidden", String(e.dataset.turnFacePanel !== turnFace(turnState))));
   syncEndTurnArt(turnButton);
-  turnMotion.mount(turnButton, {
-    face: session.handoffRequired ? "back" : "front",
-    // Temporary flip input-lock is not a reason to extinguish the amber material.
+  turnMotion.mount(turnButton, { face: turnFace(turnState),
     ready: !session.handoffRequired && !state.winner && !openingDealActive
       && !animationRunning && hiddenDrawCount === 0 && !hasPendingEffects(session),
   }, carriedPose, turnFlipAnimating);
+  handoffView.sync(openingDealActive || state.winner ? null : turnFlipAnimating
+    ? session.handoffRequired ? "outgoing" : "revealing" : session.handoffRequired ? "waiting" : null, playerLabel(state.activePlayer));
+  bindEvents();
   publishViewRendered();
+}
+
+function replaceMarkup(element: HTMLElement, html: string): void {
+  if (markup.get(element) === html) return;
+  element.innerHTML = html;
+  markup.set(element, html);
+}
+function hidePrivateHand(): void {
+  const shell = root.querySelector<HTMLElement>(".game-shell");
+  if (shell) { shell.classList.add("session-private"); shell.dataset.handPrivate = "true"; }
+  const hand = root.querySelector<HTMLElement>("#active-hand-target");
+  if (hand) { hand.inert = true; hand.setAttribute("aria-hidden", "true"); replaceMarkup(hand, ""); }
+  const debug = root.querySelector<HTMLElement>(".debug-content");
+  if (debug) replaceMarkup(debug, "");
+}
+function discardFlyingCards(): void {
+  const layer = root.querySelector<HTMLElement>("#flying-card-layer");
+  layer?.getAnimations({ subtree: true }).forEach(animation => animation.cancel());
+  layer?.replaceChildren();
+}
+function bindClick(element: HTMLElement | null, listener: () => void): void {
+  if (!element || clickBound.has(element)) return;
+  clickBound.add(element); element.addEventListener("click", listener);
 }
 
 function heroPanel(playerId: PlayerId, isActive: boolean): string {
   const player = session.state.players[playerId];
-  const target = !isActive && selectedAttackerId !== null && !session.handoffRequired && !interactionBusy();
+  const target = !isActive && selectedAttackerId !== null && !presentationLocked() && !interactionBusy();
   return heroView(playerId, isActive, player.health, player.hand.length, target);
 }
 
@@ -185,7 +207,7 @@ function boardZone(playerId: PlayerId, isActivePanel: boolean): string {
     const visualOrder = minion ? occupiedOrder++ : null;
     return boardSlot(playerId, minion, index, isActivePanel, visualOrder, occupiedCount);
   }).join("");
-  const summonMode = isActivePanel && selectedHandIndex !== null && !session.handoffRequired && !interactionBusy();
+  const summonMode = isActivePanel && selectedHandIndex !== null && !presentationLocked() && !interactionBusy();
   return `
     <section class="board-zone ${isActivePanel ? "active-board" : "opponent-board"} ${summonMode ? "summon-mode" : ""}" data-battlefield-anchor="${isActivePanel ? "active-minions" : "opponent-minions"}">
       <div class="board-caption"><span>${isActivePanel ? "己方随从" : "敌方随从"}</span><small>5 格</small></div>
@@ -204,19 +226,19 @@ function boardSlot(
 ): string {
   const logicalOffset = slotIndex - 2;
   if (!minion) {
-    const summonReady = isActivePanel && selectedHandIndex !== null && !session.handoffRequired && !interactionBusy();
-    return `<button class="board-slot empty-slot ${summonReady ? "summon-ready" : ""}" style="--battle-slot-index:${logicalOffset}" data-empty-slot="${slotIndex}" data-battlefield-slot="${playerId}-${slotIndex + 1}" ${isActivePanel && !interactionBusy() ? "" : "disabled"}><span>${slotIndex + 1}</span><small>${summonReady ? "召唤" : "空位"}</small></button>`;
+    const summonReady = isActivePanel && selectedHandIndex !== null && !presentationLocked() && !interactionBusy();
+    return `<button class="board-slot empty-slot ${summonReady ? "summon-ready" : ""}" style="--battle-slot-index:${logicalOffset}" data-empty-slot="${slotIndex}" data-battlefield-slot="${playerId}-${slotIndex + 1}" ${isActivePanel && !presentationLocked() && !interactionBusy() ? "" : "disabled"}><span>${slotIndex + 1}</span><small>${summonReady ? "召唤" : "空位"}</small></button>`;
   }
   const compactOffset = (visualOrder ?? 0) - (occupiedCount - 1) / 2;
   const card = catalog.cards.get(minion.cardId);
   const attack = Math.max(0, (card?.attack ?? 0) + minion.attackModifier);
-  const ready = playerId === session.state.activePlayer && canMinionAttack(session, minion) && !session.handoffRequired && !interactionBusy();
+  const ready = playerId === session.state.activePlayer && canMinionAttack(session, minion) && !presentationLocked() && !interactionBusy();
   const selected = selectedAttackerId === minion.instanceId;
-  const enemyTarget = playerId !== session.state.activePlayer && selectedAttackerId !== null && !session.handoffRequired && !interactionBusy();
+  const enemyTarget = playerId !== session.state.activePlayer && selectedAttackerId !== null && !presentationLocked() && !interactionBusy();
   return `
     <button class="board-slot minion ${ready ? "attack-ready" : ""} ${selected ? "selected" : ""} ${enemyTarget ? "enemy-target" : ""}"
       style="--battle-unit-index:${compactOffset};--battle-slot-index:${logicalOffset}"
-      data-minion-id="${escapeHtml(minion.instanceId)}" data-card-id="${escapeHtml(minion.cardId)}" data-owner="${playerId}" data-battlefield-slot="${playerId}-${slotIndex + 1}" ${interactionBusy() ? "disabled" : ""}>
+      data-minion-id="${escapeHtml(minion.instanceId)}" data-card-id="${escapeHtml(minion.cardId)}" data-owner="${playerId}" data-battlefield-slot="${playerId}-${slotIndex + 1}" ${presentationLocked() || interactionBusy() ? "disabled" : ""}>
       <span class="slot-number">${slotIndex + 1}</span>
       <div class="minion-art"><span>${escapeHtml((card?.name ?? minion.cardId).slice(0, 1))}</span></div>
       <strong>${escapeHtml(card?.name ?? minion.cardId)}</strong>
@@ -245,8 +267,8 @@ function handCard(cardId: CardId, index: number, handSize: number): string {
 
 function bindEvents(): void {
   document.querySelectorAll<HTMLElement>("[data-hand-index]").forEach((element) => {
-    element.addEventListener("click", () => {
-      if (session.handoffRequired || interactionBusy()) return;
+    bindClick(element, () => {
+      if (presentationLocked() || interactionBusy()) return;
       const index = Number(element.dataset.handIndex);
       selectedHandIndex = selectedHandIndex === index ? null : index;
       selectedAttackerId = null;
@@ -256,8 +278,8 @@ function bindEvents(): void {
   });
 
   document.querySelectorAll<HTMLElement>("[data-empty-slot]").forEach((element) => {
-    element.addEventListener("click", () => {
-      if (selectedHandIndex === null || interactionBusy()) return;
+    bindClick(element, () => {
+      if (presentationLocked() || selectedHandIndex === null || interactionBusy()) return;
       const error = dispatchGame({ type: "summon", handIndex: selectedHandIndex, slotIndex: Number(element.dataset.emptySlot), cardId: session.state.players[session.state.activePlayer].hand[selectedHandIndex]! });
       if (!error) selectedHandIndex = null;
       selectedAttackerId = null;
@@ -266,8 +288,8 @@ function bindEvents(): void {
   });
 
   document.querySelectorAll<HTMLElement>("[data-minion-id]").forEach((element) => {
-    element.addEventListener("click", () => {
-      if (session.handoffRequired || interactionBusy()) return;
+    bindClick(element, () => {
+      if (presentationLocked() || interactionBusy()) return;
       const instanceId = element.dataset.minionId;
       const owner = element.dataset.owner as PlayerId | undefined;
       if (!instanceId || !owner) return;
@@ -291,24 +313,20 @@ function bindEvents(): void {
     });
   });
 
-  document.querySelector<HTMLElement>("[data-hero-target]")?.addEventListener("click", () => {
-    if (!selectedAttackerId || interactionBusy()) return;
+  bindClick(document.querySelector<HTMLElement>("[data-hero-target]"), () => {
+    if (presentationLocked() || !selectedAttackerId || interactionBusy()) return;
     const error = dispatchGame({ type: "attack-hero", attackerId: selectedAttackerId });
     selectedAttackerId = null;
     selectedHandIndex = null;
     commit(error ?? "英雄受到攻击。", Boolean(error));
   });
 
-  document.querySelector<HTMLButtonElement>("#end-turn")?.addEventListener("click", () => {
+  bindClick(document.querySelector<HTMLButtonElement>("#end-turn"), () => {
     void endTurnWithFlip();
   });
 
-  document.querySelector<HTMLButtonElement>("#reveal-turn")?.addEventListener("click", () => {
-    void revealTurnWithFlip();
-  });
-
   document.querySelectorAll<HTMLElement>("[data-new-game]").forEach((element) => {
-    element.addEventListener("click", () => {
+    bindClick(element, () => {
       if (interactionBusy()) return;
       const needsConfirm = element.dataset.newGame !== "instant";
       if (needsConfirm && !window.confirm("这会覆盖当前保存的对局。确定新开一局吗？")) return;
@@ -322,8 +340,9 @@ async function endTurnWithFlip(): Promise<void> {
   const button = document.querySelector<HTMLButtonElement>("#end-turn");
   if (!button || button.disabled) return;
 
-  const origin = turnMotion.capture();
   turnFlipAnimating = true;
+  setPresentationLocked(true);
+  hidePrivateHand();
   const flipEpoch = ++turnFlipEpoch;
   const next = otherPlayer(session.state.activePlayer);
   const handBefore = session.state.players[next].hand.length;
@@ -335,12 +354,13 @@ async function endTurnWithFlip(): Promise<void> {
     commit(error, true);
     return;
   }
+  if (flipEpoch !== turnFlipEpoch) { render(); return; }
 
   pendingTurnDrawCount = Math.max(0, session.state.players[next].hand.length - handBefore);
   selectedAttackerId = null;
   selectedHandIndex = null;
   notice = "回合结束，进入交接。";
-  render(origin);
+  render();
   await playTurnFlip(flipEpoch);
 }
 
@@ -349,8 +369,9 @@ async function revealTurnWithFlip(): Promise<void> {
   const reveal = document.querySelector<HTMLButtonElement>("#reveal-turn");
   if (!reveal || reveal.disabled) return;
 
-  const origin = turnMotion.capture();
   turnFlipAnimating = true;
+  setPresentationLocked(true);
+  hidePrivateHand();
   const flipEpoch = ++turnFlipEpoch;
   const error = dispatchGame({ type: "reveal-turn" });
   session = readSession();
@@ -360,26 +381,35 @@ async function revealTurnWithFlip(): Promise<void> {
     commit(error, true);
     return;
   }
+  if (flipEpoch !== turnFlipEpoch) { render(); return; }
 
   const drawCount = pendingTurnDrawCount;
   pendingTurnDrawCount = 0;
   hiddenDrawCount = drawCount;
   notice = `${playerLabel(session.state.activePlayer)}已接手。`;
-  render(origin);
-  const completed = await playTurnFlip(flipEpoch);
+  render();
+  const completed = await playTurnFlip(flipEpoch, true);
   if (flipEpoch !== turnFlipEpoch) return;
   if (completed && drawCount > 0) void playTurnDraw(drawCount);
 }
 
-async function playTurnFlip(epoch: number): Promise<boolean> {
+async function playTurnFlip(epoch: number, reveal = false): Promise<boolean> {
   let completed = false;
   try {
-    completed = await turnMotion.play() === "completed";
+    const rotation = turnMotion.play();
+    const orientation = reveal && presentedPlayer !== session.state.activePlayer ? handoffView.switchPublic(root.querySelector<HTMLElement>("#public-battle-view")!, () => {
+      if (epoch !== turnFlipEpoch) return;
+      presentedPlayer = readSession().state.activePlayer;
+      render();
+    }) : Promise.resolve(true);
+    const [motionResult, viewResult] = await Promise.all([rotation, orientation]);
+    completed = motionResult === "completed" && viewResult;
   } finally {
     if (epoch === turnFlipEpoch) {
       // Cards were already drawn by the rule command. A discarded visual
       // transition must not start new cosmetic work in the background.
       if (!completed) hiddenDrawCount = 0;
+      if (reveal || !completed) presentedPlayer = readSession().state.activePlayer;
       turnFlipAnimating = false;
       render();
     }
@@ -393,11 +423,14 @@ function interactionBusy(): boolean {
 
 function startNewGame(): void {
   animationEpoch += 1;
+  discardFlyingCards();
   turnFlipEpoch += 1;
   turnMotion.cancel();
+  handoffView.cancelPublic();
   turnFlipAnimating = false;
   resetGame();
   session = readSession();
+  presentedPlayer = session.state.activePlayer;
   selectedAttackerId = null;
   selectedHandIndex = null;
   pendingTurnDrawCount = 0;
@@ -552,19 +585,6 @@ async function flyCardTo(
   }
   finally { card.remove(); }
   await wait(kind === "draw" ? 35 : 18);
-}
-
-function handoffOverlay(playerId: PlayerId): string {
-  return `
-    <div class="overlay">
-      <div class="overlay-card compact-overlay">
-        <div class="eyebrow">本地双人交接</div>
-        <h2>轮到${playerLabel(playerId)}</h2>
-        <p>把设备交给下一位玩家，点击后才显示当前玩家手牌。随后会播放本回合摸牌动画。</p>
-        <button id="reveal-turn" class="primary-button large">查看手牌并开始</button>
-      </div>
-    </div>
-  `;
 }
 
 function winnerOverlay(winner: PlayerId | "draw"): string {

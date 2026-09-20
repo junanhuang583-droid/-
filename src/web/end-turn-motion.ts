@@ -25,7 +25,17 @@ export class EndTurnMotion {
   }
 
   mount(button: HTMLButtonElement | null, target: TurnMotionTarget, carry: TurnPose | null, turning: boolean): void {
-    this.generation++;
+    if (button && button === this.button && this.plate?.isConnected) {
+      this.target = target;
+      if (this.playing) return;
+      const pose = carry ?? this.capture();
+      this.cancel();
+      const end = restPose(target);
+      this.origin = turning && pose ? pose : { ...end, glow: pose?.glow ?? end.glow };
+      this.paint(this.origin);
+      if (!turning) this.fadeGlow(this.origin.glow, end.glow);
+      return;
+    }
     this.cancel();
     this.input.abort();
     this.input = new AbortController();
@@ -43,6 +53,9 @@ export class EndTurnMotion {
   }
 
   cancel(): void {
+    this.generation++;
+    this.playing = false;
+    if (this.button) { delete this.button.dataset.turnFlipping; this.button.removeAttribute('aria-busy'); }
     // Rejects finished promises; play() handles cancellation and always releases its caller.
     for (const animation of this.tracks) animation.cancel();
     this.tracks.clear();
@@ -51,10 +64,10 @@ export class EndTurnMotion {
 
   async play(): Promise<'completed' | 'interrupted'> {
     const button = this.button, core = this.core, plate = this.plate;
-    const generation = this.generation;
     if (!button || !core || !plate) return 'interrupted';
     const from = this.origin, to = restPose(this.target);
     this.cancel();
+    const generation = this.generation;
     this.playing = true;
     button.dataset.turnFlipping = 'true';
     button.setAttribute('aria-busy', 'true');

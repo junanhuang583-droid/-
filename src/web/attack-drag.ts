@@ -1,3 +1,4 @@
+import { presentationLocked, onPresentationLock } from "./presentation-lock.js";
 import { canMinionAttack } from "../core/basic-game.js";
 import type { MinionInstance, PlayerId, StatusState } from "../model/state.js";
 import "./attack-drag.css";
@@ -26,6 +27,7 @@ let attackGesture: AttackGesture | null = null;
 let frame = 0;
 let suppressNextClick = false;
 
+onPresentationLock(cleanup);
 document.body.classList.add("attack-drag-enabled");
 document.addEventListener("pointerdown", onPointerDown, true);
 document.addEventListener("pointermove", onPointerMove, { capture: true, passive: false });
@@ -34,7 +36,7 @@ document.addEventListener("pointercancel", onPointerCancel, true);
 document.addEventListener("click", suppressClickAfterDrag, true);
 
 function onPointerDown(event: PointerEvent): void {
-  if (attackGesture || (event.pointerType === "mouse" && event.button !== 0)) return;
+  if (presentationLocked() || attackGesture || (event.pointerType === "mouse" && event.button !== 0)) return;
   const target = event.target;
   if (!(target instanceof Element)) return;
   const source = target.closest<HTMLElement>("[data-minion-id]");
@@ -200,7 +202,7 @@ function onPointerCancel(event: PointerEvent): void {
 }
 
 function resolveAttack(current: AttackGesture): void {
-  if (!current.targetKind) return;
+  if (presentationLocked() || !current.targetKind) return;
   const session = readSession();
   if (!session || session.handoffRequired || session.state.winner) return;
   if (!findMinion(session, current.owner, current.attackerId)) return;

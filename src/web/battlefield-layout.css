@@ -88,7 +88,34 @@ body.ab-hand-gesture-active .active-board .minion { left: calc(50% + var(--battl
 .scene-placeholder small:empty { display:none; }
 .scene-placeholder small:not(:empty) { padding:3px 8px; border-radius:12px; color:#e2ca9f; background:#14100ccd; font-size:9px; }
 .scene-lane { pointer-events:none; }
-.battle-rail { display:contents; }
+.battle-rail, #deck-view-mount { display:contents; }
+.public-battle-view { position:absolute; inset:0; pointer-events:none; outline:none; }
+.game-shell[data-presentation-locked="true"] .public-battle-view .minion:disabled { opacity:1; }
+/* R3: transparent native modal backdrop blocks interaction, not the artwork. */
+.handoff-dialog {
+  position:fixed; inset:0; margin:auto; box-sizing:border-box;
+  width:min(270px,calc(100vw - 32px)); max-height:calc(100dvh - 24px);
+  padding:0; border:1px solid #97805d; border-radius:10px;
+  color:#eee0c9; background:#171b21; box-shadow:0 5px 18px #0006;
+  font:inherit; overflow:auto;
+}
+.handoff-dialog::backdrop { background:transparent; backdrop-filter:none; }
+.handoff-card { padding:14px 18px; text-align:center; }
+.handoff-kicker { font-size:10px; color:#b7a58a; letter-spacing:.08em; }
+.handoff-dialog h2 { margin:6px 0; font-size:21px; line-height:1.2; outline:none; }
+.handoff-dialog p { margin:7px 0 12px; font-size:11px; line-height:1.6; color:#c6bcac; }
+.handoff-dialog button {
+  width:100%; min-height:38px; border:1px solid #b39967; border-radius:6px;
+  font:inherit; font-size:13px; color:#ffe9bf; background:#3a3021; cursor:pointer;
+}
+.handoff-dialog button:focus-visible { outline:2px solid #f4d694; outline-offset:2px; }
+.handoff-dialog button[hidden] { display:none; }
+.handoff-dialog:not([data-phase="waiting"]) { opacity:0; box-shadow:none; }
+@media (max-height:400px) {
+  .handoff-card { padding:10px 14px; }
+  .handoff-dialog h2 { font-size:18px; margin:4px 0; }
+  .handoff-dialog p { margin:5px 0 8px; }
+}
 .prototype-deck-chip { display:none; }
 .v2-deck, .v2-turn { position:absolute; margin:0; padding:0; border:0; background:none; box-shadow:none; transform:none; z-index:var(--layer-controls); }
 .v2-deck { pointer-events:none; }

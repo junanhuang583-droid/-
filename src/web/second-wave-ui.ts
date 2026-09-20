@@ -94,7 +94,7 @@ function controlTargetOption(minion: MinionInstance, slotIndex: number): string 
 }
 
 function applyControlBadges(session: BasicGameSession): void {
-  const active = session.state.activePlayer;
+  const active: PlayerId = document.querySelector<HTMLElement>(".game-shell")?.dataset.viewPlayer === "P2" ? "P2" : "P1";
   const opponent = otherPlayer(active);
   applyBoardBadges(".active-board", session, active);
   applyBoardBadges(".opponent-board", session, opponent);
