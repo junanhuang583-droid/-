@@ -6,7 +6,7 @@ import { turnControlAriaLabel, turnControlDisabled, turnFace } from "../applicat
 import { deriveTurnControlState } from "../application/turn-control-state.js";
 import { EndTurnMotion } from "./end-turn-motion.js";
 import { syncEndTurnArt } from "./end-turn-view.js";
-import { v2Asset } from "../application/battlefield-v2.js";
+import { DeckDrawMotion } from "./deck-draw-motion.js";
 import {
   canMinionAttack,
   hasPendingEffects,
@@ -34,6 +34,7 @@ let animationRunning = false;
 let turnFlipAnimating = false;
 let turnFlipEpoch = 0;
 const turnMotion = new EndTurnMotion();
+const deckDrawMotion = new DeckDrawMotion();
 const handoffView = new HandoffView(() => { void revealTurnWithFlip(); });
 const clickBound = new WeakSet<HTMLElement>();
 const markup = new WeakMap<HTMLElement, string>();
@@ -183,6 +184,7 @@ function hidePrivateHand(): void {
   if (debug) replaceMarkup(debug, "");
 }
 function discardFlyingCards(): void {
+  deckDrawMotion.cancel();
   const layer = root.querySelector<HTMLElement>("#flying-card-layer");
   layer?.getAnimations({ subtree: true }).forEach(animation => animation.cancel());
   layer?.replaceChildren();
@@ -271,7 +273,7 @@ function bindEvents(): void {
       const index = Number(element.dataset.handIndex);
       selectedHandIndex = selectedHandIndex === index ? null : index;
       selectedAttackerId = null;
-      notice = selectedHandIndex === null ? "已取消召唤选择。" : "请选择己方空随从位。";
+      notice = selectedHandIndex === null ? "已取消召唤选择。" : "请选择己方空位。";
       render();
     });
   });
@@ -478,17 +480,22 @@ async function playOpeningDeal(): Promise<void> {
   const active = session.state.activePlayer;
   const activeCards = opening.filter(batch => batch.acquisition.playerId === active).flatMap(batch => batch.cards);
   const opponentCards = opening.filter(batch => batch.acquisition.playerId !== active).flatMap(batch => batch.cards);
-  // Preserve the existing paired presentation for now; counts/occurrences come
-  // from actual rule results, even when one recipient received fewer cards.
+  // Keep the existing recipient order. The source presenter serializes this
+  // pair; multi-card choreography and exact hand landing are later packages.
   const openingCount = Math.max(activeCards.length, opponentCards.length);
   for (let i = 0; i < openingCount; i += 1) {
     const label = progress();
     if (label) label.textContent = `初始手牌 ${i + 1} / ${openingCount}`;
     if (epoch !== animationEpoch) return;
-    await Promise.all([
-      opponentCards[i] ? flyCardTo(opponentTarget, i, opponentCards.length, "opponent", opponentCards[i]) : Promise.resolve(),
-      activeCards[i] ? flyCardTo(activeTarget, i, activeCards.length, "active", activeCards[i]) : Promise.resolve(),
+    const results = await Promise.all([
+      opponentCards[i] ? flyCardTo(opponentTarget, "opponent", opponentCards[i]) : Promise.resolve(true),
+      activeCards[i] ? flyCardTo(activeTarget, "active", activeCards[i]) : Promise.resolve(true),
     ]);
+    if (results.some(ok => !ok)) {
+      if (epoch !== animationEpoch) return;
+      acquisitionQueue.clear();
+      break;
+    }
   }
 
   if (epoch !== animationEpoch) return;
@@ -499,7 +506,7 @@ async function playOpeningDeal(): Promise<void> {
     if (label) label.textContent = `先手摸牌 ${firstTurnDraw} 张`;
     for (let i = 0; i < firstTurnDraw; i += 1) {
       if (epoch !== animationEpoch) return;
-      await flyCardTo(activeTarget, i, firstTurnDraw, "draw", firstTurnCards[i]);
+      if (!await flyCardTo(activeTarget, "draw", firstTurnCards[i])) break;
     }
   }
 
@@ -526,7 +533,7 @@ async function playTurnDraw(cards: QueuedCard[]): Promise<void> {
   if (target) {
     for (let i = 0; i < count; i += 1) {
       if (epoch !== animationEpoch) return;
-      await flyCardTo(target, i, count, "draw", cards[i]);
+      if (!await flyCardTo(target, "draw", cards[i])) break;
     }
   }
   if (epoch !== animationEpoch) return;
@@ -538,63 +545,12 @@ async function playTurnDraw(cards: QueuedCard[]): Promise<void> {
 
 async function flyCardTo(
   target: HTMLElement,
-  index: number,
-  total: number,
   kind: "opponent" | "active" | "draw",
   occurrence?: QueuedCard,
-): Promise<void> {
-  const source = document.querySelector<HTMLElement>("#deck-source");
-  const layer = document.querySelector<HTMLElement>("#flying-card-layer");
-  if (!source || !layer) return;
-
-  const sourceRect = source.getBoundingClientRect();
-  const targetRect = target.getBoundingClientRect();
-  const card = document.createElement("div");
-  card.className = `flying-card flying-card-${kind}`;
-  // Opaque occurrence identity supports exact-once tracing without exposing a
-  // private card definition in the face-down DOM.
-  if (occurrence) card.dataset.acquisitionId = occurrence.id;
-  card.innerHTML = `<img src="${v2Asset("card-back-final")}" alt="" draggable="false" />`;
-  layer.append(card);
-
-  const width = Math.max(22, Math.min(42, sourceRect.width * 0.54));
-  const height = width * 1.38;
-  const startX = sourceRect.left + sourceRect.width / 2 - width / 2;
-  const startY = sourceRect.top + sourceRect.height / 2 - height / 2;
-  const spread = total > 1 ? (index - (total - 1) / 2) * Math.min(16, targetRect.width / (total + 2)) : 0;
-  const endX = targetRect.left + targetRect.width / 2 - width / 2 + spread;
-  const targetVertical = kind === "opponent" ? 0.62 : 0.5;
-  const endY = targetRect.top + targetRect.height * targetVertical - height / 2;
-  const dx = endX - startX;
-  const dy = endY - startY;
-  card.style.width = `${width}px`;
-  card.style.height = `${height}px`;
-  card.style.left = `${startX}px`;
-  card.style.top = `${startY}px`;
-
-  if (reducedMotion()) {
-    card.remove();
-    await wait(20);
-    return;
-  }
-
-  try {
-    const animation = card.animate([
-      { transform: "translate3d(0, 0, 0) rotate(5deg) scale(.72)", opacity: 0 },
-      { transform: `translate3d(${dx * 0.42}px, ${dy * 0.28 - 22}px, 0) rotate(-8deg) scale(1.05)`, opacity: 1, offset: 0.45 },
-      { transform: `translate3d(${dx}px, ${dy}px, 0) rotate(${kind === "opponent" ? -4 : 3}deg) scale(.86)`, opacity: 0.94 },
-    ], {
-      duration: kind === "draw" ? 250 : 210,
-      easing: "cubic-bezier(.2,.76,.24,1)",
-      fill: "forwards",
-    });
-
-    await animation.finished;
-  } catch {
-    // A render/navigation can cancel a cosmetic animation. Game state is already saved.
-  }
-  finally { card.remove(); }
-  await wait(kind === "draw" ? 35 : 18);
+): Promise<boolean> {
+  const result = await deckDrawMotion.play({ target, kind,
+    ...(occurrence ? { occurrenceId: occurrence.id } : {}) });
+  return result === "completed";
 }
 
 function winnerOverlay(winner: PlayerId | "draw"): string {

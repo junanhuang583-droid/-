@@ -1,0 +1,14 @@
+/* Authored-world children of the existing deck, below its original foreground
+ * rim (5) and above the stack. No copied rim, changed parent layout or new ruler. */
+.deck-draw-stage { position:absolute; z-index:4; pointer-events:none; overflow:visible; }
+.deck-draw-card.flying-card {
+  position:absolute; left:0; top:0; display:block; margin:0; padding:0;
+  transform-origin:0 0; opacity:1; border:0; border-radius:0;
+  background:none; box-shadow:none; pointer-events:none; will-change:transform;
+}
+.deck-draw-card.flying-card > img { width:100%; height:100%; display:block; object-fit:fill; pointer-events:none; }
+.deck-draw-card.flying-card::before,.deck-draw-card.flying-card::after { display:none; }
+
+/* The new card shares the world plane with its real occluder. Keep opening
+ * input exclusion/status, but do not blur or darken that source relationship. */
+.opening-deal-shield { background:transparent; backdrop-filter:none; }

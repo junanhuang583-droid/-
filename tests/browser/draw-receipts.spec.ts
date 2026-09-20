@@ -34,7 +34,7 @@ async function seed(page:Page,count:number){
 }
 
 for(const count of [0,1,5]){
-  test(`3B-1 committed turn receipts feed exactly ${count} old-path flight occurrences`,async({page})=>{
+  test(`3B-1 committed turn receipts feed exactly ${count} flight occurrences`,async({page})=>{
     await seed(page,count);const before=await state(page);
     const plate=await page.locator('.v2-turn-plate').elementHandle();
     await page.locator('#end-turn').click();await expect(page.locator('#reveal-turn')).toBeVisible();
@@ -56,8 +56,10 @@ for(const count of [0,1,5]){
 }
 
 test('3B-1 new game records real opening batches once without replaying them on first reveal',async({page})=>{
+  // 3B-2 deliberately serializes the single source. Batch staggering/shorter
+  // opening choreography belongs to 3B-3; keep exact 8+8+4/count checks below.
   await observe(page);await page.emulateMedia({reducedMotion:'no-preference'});await page.goto('./');
-  await expect(page.locator('#reveal-turn')).toBeVisible();
+  await expect(page.locator('#reveal-turn')).toBeVisible({timeout:15_000});
   const observed=await flights(page);
   expect(observed.filter(f=>f.kind.includes('flying-card-active'))).toHaveLength(8);
   expect(observed.filter(f=>f.kind.includes('flying-card-opponent'))).toHaveLength(8);
@@ -70,7 +72,7 @@ test('3B-1 new game records real opening batches once without replaying them on 
   await page.locator('#reveal-turn').click();await expect(page.locator('#end-turn')).toBeEnabled();
   expect(await flights(page)).toEqual(observed);
   page.once('dialog',d=>d.accept());await page.locator('[data-new-game="confirm"]').click();
-  await expect(page.locator('#reveal-turn')).toBeVisible();
+  await expect(page.locator('#reveal-turn')).toBeVisible({timeout:15_000});
   const next=await flights(page);expect(next).toHaveLength(40);expect(new Set(next.map(f=>f.id)).size).toBe(40);
   expect((await state(page)).gameId).not.toBe(s.gameId);
 });
