@@ -64,7 +64,9 @@ test('3B-1 new game records real opening batches once without replaying them on 
   expect(observed.filter(f=>f.kind.includes('flying-card-draw'))).toHaveLength(4);
   expect(new Set(observed.map(f=>f.id)).size).toBe(20);
   const s=await state(page);
-  expect(s.state.players[s.state.firstPlayer].hand).toHaveLength(12);
+  const first=s.state.firstPlayer;
+  if(first===null)throw new Error("New game must select a first player");
+  expect(s.state.players[first].hand).toHaveLength(12);
   await page.locator('#reveal-turn').click();await expect(page.locator('#end-turn')).toBeEnabled();
   expect(await flights(page)).toEqual(observed);
   page.once('dialog',d=>d.accept());await page.locator('[data-new-game="confirm"]').click();
