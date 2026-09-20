@@ -30,14 +30,14 @@ function sync(): void {
   }
 
   document.body.classList.add("foundation-cd-enabled", "foundation-ef-enabled");
-  const privateHandoff = session.handoffRequired && !session.state.winner;
+  const privateHandoff = shell.dataset.handPrivate === "true";
   document.body.classList.toggle("cd-handoff-private", privateHandoff);
   shell.classList.toggle("cd-handoff-private-shell", privateHandoff);
 
   if (privateHandoff) ensurePrivateHand(session.state.players[session.state.activePlayer].hand.length);
   else clearPrivateHand();
 
-  decorateHand(session.state.players[session.state.activePlayer].hand);
+  if (!privateHandoff) decorateHand(session.state.players[session.state.activePlayer].hand);
   decorateBattleMinions(session);
 }
 

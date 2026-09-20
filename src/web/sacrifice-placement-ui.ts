@@ -1,3 +1,4 @@
+import { presentationLocked, onPresentationLock } from "./presentation-lock.js";
 import { getSummonRequirement } from "../core/basic-game.js";
 import type { CardId } from "../model/cards.js";
 import type { MinionInstance } from "../model/state.js";
@@ -8,6 +9,7 @@ const selectedSacrifices = new Set<string>();
 let pending: { handIndex: number; cardId: CardId; sacrificeCount: number } | null = null;
 let suppressAutoOpen = false;
 
+onPresentationLock(() => { pending = null; selectedSacrifices.clear(); document.querySelector("#sacrifice-placement-overlay")?.remove(); });
 subscribeSession(() => {
   pending = null;
   selectedSacrifices.clear();
@@ -20,7 +22,7 @@ function onGestureSacrificeRequest(event: CustomEvent<{ handIndex?: number }>): 
   const handIndex = Number(event.detail?.handIndex);
   if (!Number.isInteger(handIndex)) return;
   const session = readSession();
-  if (!session || session.handoffRequired || session.state.winner) return;
+  if (presentationLocked() || !session || session.handoffRequired || session.state.winner) return;
   const cardId = session.state.players[session.state.activePlayer].hand[handIndex];
   if (!cardId) return;
   const card = catalog.cards.get(cardId);
@@ -31,6 +33,7 @@ function onGestureSacrificeRequest(event: CustomEvent<{ handIndex?: number }>): 
 }
 
 function interceptSacrificeFlow(event: MouseEvent): void {
+  if (presentationLocked()) return;
   const target = event.target;
   if (!(target instanceof Element)) return;
 
@@ -79,6 +82,7 @@ function sacrificeDetailsForElement(element: HTMLElement): { handIndex: number; 
 }
 
 function openPicker(details: { handIndex: number; cardId: CardId; sacrificeCount: number }): void {
+  if (presentationLocked()) return;
   const session = readSession();
   const card = catalog.cards.get(details.cardId);
   if (!session || !card) return;

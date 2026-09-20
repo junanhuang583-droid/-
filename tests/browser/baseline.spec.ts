@@ -236,95 +236,37 @@ for (const [width, height] of [[1536, 691], [740, 360]] as const) {
   test(`3A-4 normal-motion turn core flips while rim stays fixed ${width}x${height}`, async ({ page }, info) => {
     await page.setViewportSize({ width, height });
     await page.emulateMedia({ reducedMotion: "no-preference" });
-    const s = fresh();
-    s.state.sharedDeck = [];
-    s.state.players.P1.discardPile = [];
-    s.state.players.P2.discardPile = [];
-    await seed(page, s);
-    await ready(page);
-
-    const button = page.locator("#end-turn");
-    const core = page.locator(".v2-turn-core");
-    const rim = page.locator(".v2-turn-rim");
-    const before = await state(page);
-    const rimBefore = await rim.boundingBox();
-    const buttonBefore = await button.boundingBox();
-    expect(rimBefore && buttonBefore).toBeTruthy();
-
-    const hitbox = await button.boundingBox();
-    expect(hitbox).toBeTruthy();
-    await page.mouse.move(hitbox!.x + hitbox!.width / 2, hitbox!.y + hitbox!.height / 2);
-    await page.mouse.down();
-    await page.waitForTimeout(35);
-    const pressedTransform = await core.evaluate((element) => getComputedStyle(element).transform);
-    expect(pressedTransform).not.toBe("none");
-    await page.mouse.up();
-
-    await expect(button).toHaveAttribute("data-turn-flipping", "true");
-    expect((await state(page)).state.turn).toBe(before.state.turn + 1);
-    expect((await state(page)).handoffRequired).toBe(true);
-
-    await expect.poll(() => core.evaluate((element) => element.getAnimations().length)).toBeGreaterThan(0);
-    const outgoingTransform = await core.evaluate((element) => {
-      const animation = element.getAnimations()[0];
-      if (!animation) return "none";
-      animation.pause();
-      const duration = animation.effect?.getTiming().duration;
-      animation.currentTime = typeof duration === "number" ? duration * 0.55 : 70;
-      return getComputedStyle(element).transform;
-    });
-    expect(outgoingTransform).not.toBe("none");
-    expect(outgoingTransform).not.toBe("matrix(1, 0, 0, 1, 0, 0)");
-
-    const rimDuring = await rim.boundingBox();
-    const buttonDuring = await button.boundingBox();
-    expect(rimDuring && buttonDuring).toBeTruthy();
-    close(rimDuring!.x, rimBefore!.x);
-    close(rimDuring!.y, rimBefore!.y);
-    close(rimDuring!.width, rimBefore!.width);
-    close(rimDuring!.height, rimBefore!.height);
-    close(buttonDuring!.x, buttonBefore!.x);
-    close(buttonDuring!.y, buttonBefore!.y);
-    close(buttonDuring!.width, buttonBefore!.width);
-    close(buttonDuring!.height, buttonBefore!.height);
-    await core.evaluate((element) => element.getAnimations().forEach((animation) => animation.play()));
-
-    await expect(page.locator("#reveal-turn")).toBeVisible();
-    await expect(button).toHaveAttribute("data-turn-state", "back-waiting");
-    await expect(core).toHaveAttribute("data-turn-face", "back");
-    const afterEnd = await state(page);
-    expect(afterEnd.state.turn).toBe(before.state.turn + 1);
-    expect(afterEnd.handoffRequired).toBe(true);
-
-    const rimBeforeReveal = await rim.boundingBox();
-    expect(rimBeforeReveal).toBeTruthy();
-    await page.locator("#reveal-turn").evaluate((element) => (element as HTMLButtonElement).click());
-    await expect(button).toHaveAttribute("data-turn-flipping", "true");
-    await expect.poll(() => core.evaluate((element) => element.getAnimations().length)).toBeGreaterThan(0);
-    const incomingTransform = await core.evaluate((element) => {
-      const animation = element.getAnimations()[0];
-      if (!animation) return "none";
-      animation.pause();
-      const duration = animation.effect?.getTiming().duration;
-      animation.currentTime = typeof duration === "number" ? duration * 0.55 : 70;
-      return getComputedStyle(element).transform;
-    });
-    expect(incomingTransform).not.toBe("none");
-    expect(incomingTransform).not.toBe("matrix(1, 0, 0, 1, 0, 0)");
-    const rimDuringReveal = await rim.boundingBox();
-    expect(rimDuringReveal).toBeTruthy();
-    close(rimDuringReveal!.x, rimBeforeReveal!.x);
-    close(rimDuringReveal!.y, rimBeforeReveal!.y);
-    close(rimDuringReveal!.width, rimBeforeReveal!.width);
-    close(rimDuringReveal!.height, rimBeforeReveal!.height);
-    await core.evaluate((element) => element.getAnimations().forEach((animation) => animation.play()));
-
-    await expect(button).toHaveAttribute("data-turn-state", "front-ready");
-    await expect(button).toBeEnabled();
-    await expect(core).toHaveAttribute("data-turn-face", "front");
-    const afterReveal = await state(page);
-    expect(afterReveal.state.turn).toBe(afterEnd.state.turn);
-    expect(afterReveal.handoffRequired).toBe(false);
+    const s = fresh(); s.state.sharedDeck = [];
+    s.state.players.P1.discardPile = []; s.state.players.P2.discardPile = [];
+    await seed(page, s); await ready(page);
+    const button = page.locator("#end-turn"), rim = page.locator(".v2-turn-rim");
+    const before = await state(page), fixed = await rim.boundingBox(), hitbox = await button.boundingBox();
+    expect(fixed && hitbox).toBeTruthy();
+    for (const selector of ["#end-turn", "#reveal-turn"]) {
+      const pose = await page.locator(selector).evaluate(element => {
+        (element as HTMLButtonElement).click();
+        const button = document.querySelector('#end-turn')!;
+        const animation = button.getAnimations({subtree:true}).find(a => a.id === 'turn-plate-rotation');
+        if (!animation) throw new Error('Missing physical plate rotation');
+        const time = Number(animation.effect!.getTiming().duration) * .5;
+        button.getAnimations({subtree:true}).forEach(a => { a.pause(); a.currentTime=time; });
+        const matrix = new DOMMatrixReadOnly(getComputedStyle(button.querySelector('.v2-turn-plate')!).transform);
+        return {m23:matrix.m23,m22:matrix.m22};
+      });
+      expect(Math.abs(pose.m23)).toBeGreaterThan(.5);
+      expect(Math.abs(pose.m22)).toBeLessThan(.85);
+      const current = await state(page);
+      expect(current.state.turn).toBe(before.state.turn + 1);
+      expect(current.handoffRequired).toBe(selector === '#end-turn');
+      const nowRim = await rim.boundingBox(), nowButton = await button.boundingBox();
+      for (const key of ['x','y','width','height'] as const) {
+        close(nowRim![key],fixed![key]); close(nowButton![key],hitbox![key]);
+      }
+      await button.evaluate(element => element.getAnimations({subtree:true}).forEach(a=>a.play()));
+      if (selector === '#end-turn') await expect(page.locator('#reveal-turn')).toBeVisible();
+      else await expect(button).toBeEnabled();
+    }
+    await expect(page.locator('.v2-turn-core')).toHaveAttribute('data-turn-face','front');
     await screenshot(page, info, `3a4-normal-motion-${width}x${height}`);
   });
 }
@@ -378,16 +320,14 @@ test("3A-4 reduced motion switches face without a 3D core transform", async ({ p
   await ready(page);
 
   await page.locator("#end-turn").evaluate((element) => (element as HTMLButtonElement).click());
-  await expect(page.locator("#end-turn")).toHaveAttribute("data-turn-flipping", "true");
-  await page.waitForTimeout(20);
-  expect(await page.locator(".v2-turn-core").evaluate((element) => getComputedStyle(element).transform)).toBe("none");
   await expect(page.locator("#reveal-turn")).toBeVisible();
   await expect(page.locator(".v2-turn-core")).toHaveAttribute("data-turn-face", "back");
+  expect(await page.locator('#end-turn').evaluate(element => element.getAnimations({subtree:true})
+    .filter(a => a.id === 'turn-plate-rotation').length)).toBe(0);
 
-  await page.locator("#reveal-turn").evaluate((element) => (element as HTMLButtonElement).click());
-  await expect(page.locator("#end-turn")).toHaveAttribute("data-turn-flipping", "true");
-  await page.waitForTimeout(20);
-  expect(await page.locator(".v2-turn-core").evaluate((element) => getComputedStyle(element).transform)).toBe("none");
+  await page.locator("#reveal-turn").click();
   await expect(page.locator("#end-turn")).toHaveAttribute("data-turn-state", "front-ready");
   await expect(page.locator(".v2-turn-core")).toHaveAttribute("data-turn-face", "front");
+  expect(await page.locator('#end-turn').evaluate(element => element.getAnimations({subtree:true})
+    .filter(a => a.id === 'turn-plate-rotation').length)).toBe(0);
 });

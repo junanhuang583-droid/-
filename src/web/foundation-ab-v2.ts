@@ -1,3 +1,4 @@
+import { presentationLocked, onPresentationLock } from "./presentation-lock.js";
 import {
   canMinionAttack,
   getSummonRequirement
@@ -49,6 +50,9 @@ document.addEventListener("click", onHandToggleClick, true);
 document.addEventListener("click", onMinionClick, true);
 document.addEventListener("click", suppressLegacyHandClick, true);
 document.addEventListener("click", closeInspectorFromOutside, true);
+onPresentationLock(() => {
+  cleanupGesture(); closeMinionInspector(); removeLegacyPreviews(); setHandExpanded(false);
+});
 scheduleSync();
 
 function scheduleSync(): void {
@@ -65,7 +69,7 @@ function syncFoundation(): void {
   const shell = document.querySelector<HTMLElement>(".game-shell");
   if (!session || !shell) return;
 
-  const active = session.state.activePlayer;
+  const active: PlayerId = shell.dataset.viewPlayer === "P2" ? "P2" : "P1";
   const opponent = otherPlayer(active);
   if (lastActivePlayer !== null && lastActivePlayer !== active) handExpanded = false;
   lastActivePlayer = active;
@@ -125,6 +129,7 @@ function fanHand(): void {
 }
 
 function onPointerDown(event: PointerEvent): void {
+  if (presentationLocked()) return;
   if (gesture || (event.pointerType === "mouse" && event.button !== 0)) return;
   const target = event.target;
   if (!(target instanceof Element)) return;
@@ -133,7 +138,7 @@ function onPointerDown(event: PointerEvent): void {
   if (document.querySelector(".opening-deal-shield, .draw-animating, .overlay, #sacrifice-placement-overlay, #rule-choice-overlay, #unit-effect-overlay")) return;
 
   const session = readSession();
-  if (!session || session.handoffRequired || session.state.winner) return;
+  if (presentationLocked() || !session || session.handoffRequired || session.state.winner) return;
   const handIndex = resolveHandIndex(source);
   if (handIndex < 0) return;
   const cardId = session.state.players[session.state.activePlayer].hand[handIndex];
@@ -259,8 +264,9 @@ function onPointerCancel(event: PointerEvent): void {
 }
 
 function resolveGestureDrop(current: HandGesture): void {
+  if (presentationLocked()) return;
   const session = readSession();
-  if (!session || session.handoffRequired || session.state.winner) return;
+  if (presentationLocked() || !session || session.handoffRequired || session.state.winner) return;
   const active = session.state.activePlayer;
   const currentCardId = session.state.players[active].hand[current.handIndex];
   if (currentCardId !== current.cardId) return;
@@ -376,6 +382,7 @@ function frameClassForSeries(series: string | null | undefined): string {
 }
 
 function onHandToggleClick(event: MouseEvent): void {
+  if (presentationLocked()) return;
   const target = event.target;
   if (!(target instanceof Element)) return;
   const toggle = target.closest<HTMLElement>(".stage04-hand-toggle");
@@ -417,6 +424,7 @@ function suppressLegacyHandClick(event: MouseEvent): void {
 }
 
 function onMinionClick(event: MouseEvent): void {
+  if (presentationLocked()) return;
   if (bypassMinionInspector) return;
   const target = event.target;
   if (!(target instanceof Element)) return;

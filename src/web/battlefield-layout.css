@@ -88,7 +88,34 @@ body.ab-hand-gesture-active .active-board .minion { left: calc(50% + var(--battl
 .scene-placeholder small:empty { display:none; }
 .scene-placeholder small:not(:empty) { padding:3px 8px; border-radius:12px; color:#e2ca9f; background:#14100ccd; font-size:9px; }
 .scene-lane { pointer-events:none; }
-.battle-rail { display:contents; }
+.battle-rail, #deck-view-mount { display:contents; }
+.public-battle-view { position:absolute; inset:0; pointer-events:none; outline:none; }
+.game-shell[data-presentation-locked="true"] .public-battle-view .minion:disabled { opacity:1; }
+/* R3: transparent native modal backdrop blocks interaction, not the artwork. */
+.handoff-dialog {
+  position:fixed; inset:0; margin:auto; box-sizing:border-box;
+  width:min(270px,calc(100vw - 32px)); max-height:calc(100dvh - 24px);
+  padding:0; border:1px solid #97805d; border-radius:10px;
+  color:#eee0c9; background:#171b21; box-shadow:0 5px 18px #0006;
+  font:inherit; overflow:auto;
+}
+.handoff-dialog::backdrop { background:transparent; backdrop-filter:none; }
+.handoff-card { padding:14px 18px; text-align:center; }
+.handoff-kicker { font-size:10px; color:#b7a58a; letter-spacing:.08em; }
+.handoff-dialog h2 { margin:6px 0; font-size:21px; line-height:1.2; outline:none; }
+.handoff-dialog p { margin:7px 0 12px; font-size:11px; line-height:1.6; color:#c6bcac; }
+.handoff-dialog button {
+  width:100%; min-height:38px; border:1px solid #b39967; border-radius:6px;
+  font:inherit; font-size:13px; color:#ffe9bf; background:#3a3021; cursor:pointer;
+}
+.handoff-dialog button:focus-visible { outline:2px solid #f4d694; outline-offset:2px; }
+.handoff-dialog button[hidden] { display:none; }
+.handoff-dialog:not([data-phase="waiting"]) { opacity:0; box-shadow:none; }
+@media (max-height:400px) {
+  .handoff-card { padding:10px 14px; }
+  .handoff-dialog h2 { font-size:18px; margin:4px 0; }
+  .handoff-dialog p { margin:5px 0 8px; }
+}
 .prototype-deck-chip { display:none; }
 .v2-deck, .v2-turn { position:absolute; margin:0; padding:0; border:0; background:none; box-shadow:none; transform:none; z-index:var(--layer-controls); }
 .v2-deck { pointer-events:none; }
@@ -104,20 +131,60 @@ body.ab-hand-gesture-active .active-board .minion { left: calc(50% + var(--battl
   transform:none; filter:none; opacity:1; touch-action:manipulation;
   -webkit-tap-highlight-color:transparent; perspective:420px; perspective-origin:50% 50%;
 }
-.v2-turn-core { position:absolute; display:block; background:#30271b;
-  border:1px solid #b19567; border-radius:9px; transform-origin:50% 50%; transform-style:preserve-3d;
-  will-change:transform; transition:transform 100ms ease,filter 120ms ease; }
-.v2-turn-face { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; visibility:hidden;
-  backface-visibility:hidden; -webkit-backface-visibility:hidden; }
-.v2-turn-face > img { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; display:none; }
-.v2-turn-face-front { z-index:2; }
-.v2-turn-face-back { z-index:1; }
+/* R2: the carrier only seats/presses the shared plate. Rotation belongs to
+ * .v2-turn-plate. Neither 3D owner may be filtered, faded or clipped. */
+.v2-turn-core {
+  position:absolute; display:block; background:none; border:0;
+  --turn-plate-angle:0deg;
+  transform-origin:50% 50%; transform-style:preserve-3d;
+  filter:none; overflow:visible; opacity:1;
+}
+.v2-turn-core[data-turn-face="back"] { --turn-plate-angle:180deg; }
+.v2-turn-plate {
+  position:absolute; inset:0; display:block; pointer-events:none;
+  transform-style:preserve-3d; transform-origin:50% 50%;
+  filter:none; overflow:visible; opacity:1;
+  transform:translateZ(calc(-1 * var(--turn-plate-half-depth))) rotateX(var(--turn-plate-angle));
+}
+.v2-turn-face {
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  pointer-events:none; visibility:hidden;
+  backface-visibility:hidden; -webkit-backface-visibility:hidden;
+}
+.v2-turn-face::before {
+  content:""; position:absolute; inset:0; background:#30271b;
+  clip-path:polygon(19.4% 0,82.1% 0,100% 25%,100% 75%,82.7% 100%,18.4% 100%,0 75%,0 25%);
+}
+.v2-turn-texture { position:absolute; overflow:hidden; pointer-events:none; }
+.v2-turn-texture > img { position:absolute; max-width:none; pointer-events:none; display:none; }
+.v2-turn-face-front { transform:translateZ(var(--turn-plate-half-depth)); }
+.v2-turn-face-back { transform:rotateX(180deg) translateZ(var(--turn-plate-half-depth)); }
 .v2-turn-core[data-turn-face="front"] .v2-turn-face-front,
-.v2-turn-core[data-turn-face="back"] .v2-turn-face-back { visibility:visible; }
-#end-turn.end-turn-art-ready .v2-turn-core { border:0; background:none; }
-#end-turn.end-turn-art-ready .v2-turn-face > img { display:block; }
+.v2-turn-core[data-turn-face="back"] .v2-turn-face-back,
+#end-turn[data-turn-flipping="true"] .v2-turn-face { visibility:visible; }
+.v2-turn-edge {
+  position:absolute; display:block; height:var(--turn-plate-depth);
+  transform-origin:0 0;
+  transform:rotateZ(var(--edge-angle)) rotateX(90deg) translateY(calc(-1 * var(--turn-plate-half-depth)));
+  background:linear-gradient(to bottom,#302720,#665243 48%,#241e19);
+  backface-visibility:hidden; pointer-events:none;
+}
+#end-turn.end-turn-art-ready .v2-turn-face::before { display:none; }
+#end-turn.end-turn-art-ready .v2-turn-texture > img { display:block; }
 .v2-turn-rim { position:absolute; z-index:4; pointer-events:none; }
-.v2-turn-light { opacity:1; transition:opacity 120ms ease; }
+.v2-turn-light { opacity:1; }
+.v2-turn-contact {
+  position:absolute; pointer-events:none; opacity:.22;
+  background:radial-gradient(ellipse at center,#000b,transparent 67%);
+  transform:translateY(22px); z-index:0;
+}
+.v2-turn-shade,.v2-turn-sheen {
+  position:absolute; inset:0; pointer-events:none; opacity:0;
+  clip-path:polygon(19.4% 0,82.1% 0,100% 25%,100% 75%,82.7% 100%,18.4% 100%,0 75%,0 25%);
+}
+.v2-turn-shade { z-index:4; background:#090d13; }
+.v2-turn-sheen { z-index:5; background:linear-gradient(165deg,transparent 20%,#ffe7b7 48%,transparent 73%); }
+#end-turn[data-turn-flipping="true"] .v2-turn-plate { will-change:transform; }
 .end-turn-label { position:relative; z-index:3; opacity:1; color:#211609; font-size:20px; font-weight:800; line-height:1;
   white-space:nowrap; text-shadow:0 1px 1px #ffe7a0,0 -1px 1px #ffd16c; pointer-events:none; }
 .end-turn-back-fallback { position:relative; z-index:3; color:#c8beb0; font-size:15px; font-weight:700; line-height:1; white-space:nowrap; text-shadow:0 1px 2px #000; pointer-events:none; }
@@ -125,13 +192,8 @@ body.ab-hand-gesture-active .active-board .minion { left: calc(50% + var(--battl
 #end-turn.end-turn-art-ready .end-turn-back-fallback { display:none; }
 #end-turn:disabled { cursor:not-allowed; opacity:1; filter:none; }
 #end-turn[data-turn-state="back-waiting"] { cursor:default; }
-#end-turn:disabled .v2-turn-light { opacity:0; }
-#end-turn:disabled .end-turn-label { color:#b9b3a6; text-shadow:0 1px 2px #000; }
-#end-turn:enabled:active .v2-turn-core { transform:translateY(1.378px) scale(.985); filter:brightness(.92); }
-#end-turn[data-turn-flipping="true"] .v2-turn-core { transition:none; }
 #end-turn:focus-visible { outline:2px solid #f6d598; outline-offset:3px; }
 #end-turn::before,#end-turn::after { display:none; }
-@media (hover:hover) and (pointer:fine) { #end-turn:enabled:hover .v2-turn-core { filter:brightness(1.06); } }
 /* Static housing, rim and hitbox are intentionally outside the motion target. */
 .cd-private-back.cd-card-back { border:0; background:none; box-shadow:0 3px 10px #0006; }
 .cd-private-back.cd-card-back::before,.cd-private-back.cd-card-back::after { display:none; }
@@ -185,8 +247,7 @@ body.cd-handoff-private .hand-row { visibility: hidden; }
  * away from their baked housings in portrait. Tool/menu controls remain in screen space. */
 @media (prefers-reduced-motion: reduce) {
   .hand-dock, .hand-card, .board-slot { transition: none; }
-  #end-turn:enabled:active .v2-turn-core { transform:none; }
-  .v2-turn-core,.v2-turn-light { transition:none; }
+  .v2-turn-plate { will-change:auto; }
 }
 
 .session-private .hand-row { visibility: hidden; }

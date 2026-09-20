@@ -11,7 +11,9 @@ for (const name of required) {
 }
 onViewRendered(sync, 90);
 function sync(): void {
-  const button = document.querySelector<HTMLButtonElement>('#end-turn');
+  syncEndTurnArt(document.querySelector<HTMLButtonElement>('#end-turn'));
+}
+export function syncEndTurnArt(button: HTMLButtonElement | null): void {
   if (!button) return;
   button.classList.toggle('end-turn-art-ready',required.every(name => decoded.has(name)));
   // Text always remains live/readable, including load failure and disabled state.
