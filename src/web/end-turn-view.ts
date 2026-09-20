@@ -1,8 +1,8 @@
-import { v2Asset } from '../application/battlefield-v2.js';
+import { v2Asset, TURN_BACK_RAIL_ASSET } from '../application/battlefield-v2.js';
 import { onViewRendered } from './view-events.js';
 
 const decoded = new Set<string>();
-const required = ['turn-core-front-neutral','turn-core-light','turn-core-back'] as const;
+const required = ['turn-core-front-neutral','turn-core-light','turn-core-back',TURN_BACK_RAIL_ASSET] as const;
 for (const name of required) {
   const probe = new Image();
   probe.onload = () => { if (probe.naturalWidth > 0) decoded.add(name); sync(); };

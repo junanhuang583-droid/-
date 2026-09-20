@@ -106,6 +106,18 @@ export async function checkTurnRelease(browser, url, sourceCommit, output) {
               filter: getComputedStyle(e, '::backdrop').backdropFilter,
             }));
             assert.deepEqual(backdrop, { color: 'rgba(0, 0, 0, 0)', filter: 'none' });
+            const lowerRail = await page.locator('.v2-turn-back-lower-rail').evaluate(async element => {
+              await element.decode();
+              const canvas = document.createElement('canvas'); canvas.width = 196; canvas.height = 96;
+              const ctx = canvas.getContext('2d'); ctx.drawImage(element, 0, 0);
+              const pixels = ctx.getImageData(0, 0, 196, 96).data;
+              return { source: element.src.split('/').at(-1),
+                alpha: [70, 78, 118, 126].map(x => pixels[(84 * 196 + x) * 4 + 3]),
+                mountedOnPlate: Boolean(element.closest('.v2-turn-plate')) };
+            });
+            assert.equal(lowerRail.source, 'turn-core-back-lower-rail.webp');
+            assert(lowerRail.alpha.every(a => a === 255) && lowerRail.mountedOnPlate, 'Missing moving back-face lower rail');
+            report.lowerRail = lowerRail;
             await page.screenshot({ path: join(output, `${width}x${height}-motion-waiting.png`) });
           } else {
             await page.locator('#end-turn:not(:disabled)').waitFor();

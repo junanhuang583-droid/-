@@ -65,6 +65,9 @@ export function turnPlateStyle(): string {
   return `--turn-plate-depth:${TURN_PLATE.depth}px;--turn-plate-half-depth:${TURN_PLATE.depth / 2}px`;
 }
 
+/** Local restoration belongs to the moving B3 texture, never the fixed cavity. */
+export const TURN_BACK_RAIL_ASSET = 'turn-core-back-lower-rail';
+
 /** A uniform contain fit preserves the approved emblem's aspect ratio. */
 export function turnFaceRect(face: 'front' | 'back'): Rect {
   const id = face === 'front' ? 'turn-core-front-neutral' : 'turn-core-back';

@@ -1,0 +1,40 @@
+{
+  "baseline": "ba420dc48e9513a5c363a37c03b34fda42a8a5a8",
+  "sourceAsset": "extra/turn-core-back.webp",
+  "sourceSha256": "adcd3eb725ed3c15c15d18eec873f0102c56b87d7b70ddecb6c5a76f72e365af",
+  "outputAsset": "extra/turn-core-back-lower-rail.webp",
+  "outputSha256": "c4f6aac8823b77304f1ecaa1ff0061d47a051deea736faef3115f6407622fe0a",
+  "sourceCanvas": [
+    196,
+    96
+  ],
+  "donorRect": [
+    60,
+    19,
+    78,
+    8
+  ],
+  "destinationRect": [
+    60,
+    79,
+    78,
+    8
+  ],
+  "method": "Reuse the same B3 straight upper metal rail with a vertical flip for its bottom-facing bevel; RGB gain0.9, four-pixel horizontal alpha feather at each join. Central emblem x74..121 at y79..80 is excluded. Exact lossless transparent restoration layer; all other pixels are transparent. It is attached to the moving back face, not the fixed cavity. Not claimed recovery of unknown original pixels or generated imagery.",
+  "visibleCrop": [
+    21,
+    11,
+    156,
+    76
+  ],
+  "preserved": [
+    "original B3 file bytes",
+    "original decoded B3 pixels outside rail bounds and protected emblem",
+    "central emblem x74..121 y30..80",
+    "front/light/rim and battlefield assets",
+    "R1 pivot and proportional UVs",
+    "R2 timing and moving plate",
+    "R3 private handoff",
+    "rules, saves, global layout"
+  ]
+}
