@@ -1,4 +1,4 @@
-import { V2, deckSlices, relativeRect, sourceRect, fixedRect, v2Asset, turnPlateStyle, turnPlateEdges, turnTextureStyle, turnTextureImageStyle } from '../application/battlefield-v2.js';
+import { V2, deckSlices, relativeRect, sourceRect, fixedRect, v2Asset, turnPlateStyle, turnPlateEdges, turnTextureStyle, turnTextureImageStyle, TURN_BACK_RAIL_ASSET } from '../application/battlefield-v2.js';
 import type { PlayerId } from '../model/state.js';
 import { turnControlAriaLabel, turnControlDisabled, turnFace, type TurnControlState } from '../application/turn-control-state.js';
 
@@ -39,6 +39,7 @@ export function turnView(state: TurnControlState): string {
         <span class="v2-turn-face v2-turn-face-back" data-turn-face-panel="back" aria-hidden="${backHidden}">
           <span class="v2-turn-texture" data-turn-texture="back" style="${turnTextureStyle('back')}">
             ${img('turn-core-back','v2-turn-back',turnTextureImageStyle('back'))}
+            ${img(TURN_BACK_RAIL_ASSET,'v2-turn-back-lower-rail',turnTextureImageStyle('back'))}
           </span>
           <span class="end-turn-back-fallback">等待接手</span>
           <span class="v2-turn-shade" aria-hidden="true"></span><span class="v2-turn-sheen" aria-hidden="true"></span>

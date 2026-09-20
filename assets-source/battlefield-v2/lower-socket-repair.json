@@ -2,13 +2,63 @@
   "baseline": "1e908ae57851b30070235a5b3fe825f11c59efcc",
   "sourceAsset": "battlefield-v2-clean.webp",
   "sourceSha256": "267d743ce079b1a7aa0d93371348cadd9546bd44b78c873a124330fe6100429b",
-  "exportCrop": [1948, 616, 316, 63],
+  "exportCrop": [
+    1948,
+    616,
+    316,
+    63
+  ],
   "exportToWorldScale": 0.5,
   "masterToExportScale": 1.3779904306220097,
-  "maskMasterPolygon": [[1424,461],[1463,478],[1591,478],[1633,455],[1633,466],[1595,487],[1462,487],[1424,474]],
-  "method": "Clone existing empty cavity texture into the obsolete lower face bevel only. Donor y=target y-40 export pixels; donor x=round(centerX+(targetX-centerX)*0.89), centerX=1526*288/209. Mask feather 1 export pixel. No generated art, painted stone, mirrored corners, or new emblem.",
+  "maskMasterPolygon": [
+    [
+      1424,
+      461
+    ],
+    [
+      1463,
+      478
+    ],
+    [
+      1591,
+      478
+    ],
+    [
+      1633,
+      455
+    ],
+    [
+      1633,
+      466
+    ],
+    [
+      1595,
+      487
+    ],
+    [
+      1462,
+      487
+    ],
+    [
+      1424,
+      474
+    ]
+  ],
+  "method": "Same existing alpha mask and exported crop; replace the obsolete bevel with more central cavity texture, not its blue side edge. Donor y=target y-65 export pixels; donor x=round(centerX+(targetX-centerX)*0.55), centerX=1526*288/209. No generated art or global layout change.",
   "maskFeatherExportPx": 1,
-  "encoding": {"format":"WebP","quality":94,"method":6},
-  "outputSha256": "739a1b31500cf4d722dc0b32dce8fb470fe9d7b02baf7741be9fb68664a8ee2a",
-  "unchanged": ["all original asset bytes","B3 content/crop/uniform scale","outer housing and latch texture","plate/input pivots","R2 animation timing","R3 private handoff","rules and persistence"]
+  "encoding": {
+    "format": "WebP",
+    "quality": 94,
+    "method": 6
+  },
+  "outputSha256": "eb6b188b71830c8cb0d65af94b8c6a136d266ccab96ce2fd49162d2774fef16e",
+  "unchanged": [
+    "all original approved asset bytes (previous repair derivative updated)",
+    "B3 content/crop/uniform scale",
+    "outer housing and latch texture",
+    "plate/input pivots",
+    "R2 animation timing",
+    "R3 private handoff",
+    "rules and persistence"
+  ]
 }
