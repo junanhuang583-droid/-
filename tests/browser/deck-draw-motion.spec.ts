@@ -36,9 +36,12 @@ async function shot(page:Page,info:TestInfo,name:string){
 for(const [width,height] of [[1536,691],[740,360]] as const){
   test(`3B-2 projected birth and real rim occlusion ${width}x${height}`,async({page},info)=>{
     await page.setViewportSize({width,height});await start(page);
-    const fixed=await page.locator('.v2-deck-rim').boundingBox(),rimHandle=await page.locator('.v2-deck-rim').elementHandle();
+    const fixed=await page.locator('.v2-deck-rim').boundingBox();
     const turn=await page.locator('.v2-turn-plate').elementHandle();const before=await state(page);
     await page.locator('#end-turn').click();await expect(page.locator('#reveal-turn')).toBeVisible();
+    // The count-changing rule commit may rebuild the idle deck. Capture the
+    // actual source rim after that commit, then require identity throughout flight.
+    const rimHandle=await page.locator('.v2-deck-rim').elementHandle();
     const committed=await state(page);await pauseAtBirth(page);await page.locator('#reveal-turn').click();
     const card=page.locator('.deck-draw-card');await expect(card).toBeVisible();await seek(page,0);
     const projected=await card.evaluate((e,size)=>{
