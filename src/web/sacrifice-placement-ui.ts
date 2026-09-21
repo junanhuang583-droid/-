@@ -1,3 +1,4 @@
+import "./sacrifice-placement-ui.css";
 import { presentationLocked, onPresentationLock } from "./presentation-lock.js";
 import { getSummonRequirement } from "../core/basic-game.js";
 import type { CardId } from "../model/cards.js";
@@ -98,13 +99,17 @@ function openPicker(details: { handIndex: number; cardId: CardId; sacrificeCount
   document.querySelector("#rule-choice-overlay")?.remove();
   document.querySelector("#sacrifice-placement-overlay")?.remove();
 
-  const overlay = document.createElement("div");
+  const overlay = document.createElement("dialog");
   overlay.id = "sacrifice-placement-overlay";
   overlay.className = "sacrifice-placement-overlay";
+  overlay.setAttribute("aria-labelledby", "sacrifice-placement-title");
+  overlay.addEventListener("cancel", event => {
+    event.preventDefault(); pending = null; selectedSacrifices.clear(); overlay.remove();
+  });
   overlay.innerHTML = `
     <section class="sacrifice-placement-card">
       <div class="sacrifice-kicker">献祭召唤 · 落位规则</div>
-      <h2>召唤「${escapeHtml(card.name)}」</h2>
+      <h2 id="sacrifice-placement-title">召唤「${escapeHtml(card.name)}」</h2>
       <p>选择 ${details.sacrificeCount} 只己方随从。新随从会直接落在被献祭的位置；献祭多只时，落在最左侧被献祭随从的位置。</p>
       <div class="sacrifice-placement-grid">
         ${player.board.map((minion, index) => minion ? sacrificeOption(minion, index) : "").join("")}
@@ -138,6 +143,9 @@ function openPicker(details: { handIndex: number; cardId: CardId; sacrificeCount
   overlay.querySelector<HTMLButtonElement>("#sacrifice-placement-confirm")?.addEventListener("click", () => {
     resolveSacrificeSummon(overlay);
   });
+  // The existing confirmation must own focus/hit testing, not sit underneath
+  // the fixed hand dock. Native modal exclusion leaves its rule path unchanged.
+  overlay.showModal();
 }
 
 function updatePickerCount(overlay: HTMLElement): void {

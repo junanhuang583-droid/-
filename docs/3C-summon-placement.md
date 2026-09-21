@@ -56,3 +56,13 @@ preparatory, not production evidence. Pinned npm installation is unavailable
 locally (ENOTCACHED). Final acceptance must use repository CI, raw reports and
 opened production screenshots. Record exact accepted/deployed SHA and counts on
 the PR. No physical-device performance or user aesthetic approval is presumed.
+
+## Final integration corrections
+The initial CI passed all existing 3A/3B regressions and new direct-placement
+cases, but exposed the existing sacrifice picker as unstyled ordinary document
+content under the fixed hand dock. Its original selection/confirmation handler
+now uses a scoped native dialog with focus and hit-test exclusion plus Escape
+cancellation. Sacrifice costs, targets, deathrattles and landing are untouched.
+A native held-key probe also found selection could chain into confirmation after
+focus moved; repeated Enter/Space is now rejected while a target is selected.
+Both behaviors have explicit browser regression checks; no failure is bypassed.

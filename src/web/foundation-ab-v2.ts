@@ -304,6 +304,10 @@ function onPlacementKey(event: KeyboardEvent): void {
     event.preventDefault(); event.stopImmediatePropagation(); cancelPlacement(true); return;
   }
   if (presentationLocked()) return;
+  // Holding the selection key must not confirm the newly focused slot.
+  if (keyboardPlacement && event.repeat && ['Enter', ' '].includes(event.key)) {
+    event.preventDefault(); event.stopImmediatePropagation(); return;
+  }
   const target = event.target instanceof Element ? event.target : null;
   if (keyboardPlacement && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
     const slots = [...document.querySelectorAll<HTMLElement>('.active-board [data-summon-legal]')];

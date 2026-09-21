@@ -92,8 +92,8 @@ for(const reason of ['Escape','pointercancel','lostcapture','blur','hidden','res
 test('3C final release coordinates override the last rendered target',async({page})=>{
   const s=fresh();s.state.players.P1.hand=['C001'];await setup(page,s);await begin(page);await toBoard(page);
   await expect(page.locator(legal)).toHaveCount(5);
-  // Explicit event-order test: hold rAF after a valid target, then release outside
-  // without a new rendered frame. Do not misdescribe this as a native touch test.
+  // Explicit event-order test: release outside after a valid target without a
+  // new move event/rendered target. This is not a native touch test.
   const r=(await page.locator('.active-board [data-empty-slot="2"]').boundingBox())!;
   await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await expect(page.locator('[data-summon-target]')).toHaveCount(1);
   const before=await saved(page);
@@ -131,4 +131,28 @@ test('3C real cross-tab change invalidates pending targets before pointer releas
   await other.locator('#end-turn').click();await expect(page.locator('#reveal-turn')).toBeVisible();
   await clean(page);await page.mouse.up();expect((await saved(page)).state.players.P1.board.every(x=>!x)).toBe(true);
   await other.close();
+});
+
+
+test('3C held keyboard activation cannot confirm a newly focused target',async({page})=>{
+  const s=fresh();s.state.players.P1.hand=['C001'];await setup(page,s);
+  await page.locator('.stage04-hand-toggle').click();await page.locator('[data-hand-index="0"]').focus();
+  const before=await saved(page);
+  await page.keyboard.down('Enter');await expect(page.locator(legal)).toHaveCount(5);
+  await page.keyboard.down('Enter');await page.keyboard.down('Enter');
+  await expect(page.locator(legal)).toHaveCount(5);expect((await saved(page)).state).toEqual(before.state);
+  await page.keyboard.up('Enter');await page.keyboard.press('Enter');await clean(page);
+  expect((await saved(page)).revision).toBe((before.revision??0)+1);
+  expect((await saved(page)).state.players.P1.board[0]?.cardId).toBe('C001');
+});
+
+
+test('3C sacrifice modal cancel preserves cards, costs and summon allowance',async({page},info)=>{
+  const s=fresh();s.state.players.P1.hand=['C003'];s.state.players.P1.board[2]=unit('C001','P1');
+  await setup(page,s);const before=await saved(page);await begin(page);await toBoard(page);await page.mouse.up();
+  const dialog=page.locator('#sacrifice-placement-overlay');await expect(dialog).toBeVisible();
+  expect(await dialog.evaluate(e=>(e as HTMLDialogElement).matches(':modal'))).toBe(true);
+  await shot(page,info,'usable-sacrifice-confirmation');
+  await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);await clean(page);
+  expect((await saved(page)).state).toEqual(before.state);expect((await saved(page)).revision).toBe(before.revision);
 });
