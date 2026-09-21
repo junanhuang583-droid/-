@@ -25,15 +25,16 @@ function scheduleSync(): void {
 
 function sync(): void {
   const session = readSession();
-  if (presentationLocked() || !session) {
-    removePreview();
-    return;
+  if (!session) { removePreview(); return; }
+  // A draw lock forbids interaction, not rendering the committed incoming face.
+  // Decorate hidden slots before their individual unfold; do not expose a raw
+  // prototype ID until the whole batch unlocks. Private handoff has no face DOM.
+  const privateHand = document.querySelector<HTMLElement>(".game-shell")?.dataset.handPrivate === "true";
+  if (!privateHand) {
+    decorateDeckInfo();
+    decorateSpecialCards(session.state.players[session.state.activePlayer].hand);
   }
-
-
-
-  decorateDeckInfo();
-  decorateSpecialCards(session.state.players[session.state.activePlayer].hand);
+  if (presentationLocked() || privateHand) { removePreview(); return; }
   syncSpecialPreview(session.state.players[session.state.activePlayer].hand);
 }
 
@@ -70,6 +71,8 @@ function decorateSpecialCards(hand: CardId[]): void {
       definition.type === "evolution_stone" ? "ef-type-evolution" : "ef-type-attack",
     );
     button.classList.toggle("prototype-selected", selectedSpecialIndex === index);
+    if (button.dataset.prototypeRenderKey === definition.id) return;
+    button.dataset.prototypeRenderKey = definition.id;
     button.innerHTML = `
       <span class="card-id">${escapeHtml(definition.id)}</span>
       <div class="prototype-special-art"><span>${definition.type === "evolution_stone" ? "◇" : "攻"}</span></div>

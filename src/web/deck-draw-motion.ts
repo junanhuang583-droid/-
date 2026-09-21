@@ -32,6 +32,23 @@ export class DeckDrawMotion {
     for (const cleanup of this.cleanups) cleanup();
     this.cleanups.clear();
   }
+  /** Await decorated target geometry without hanging when a page stops rendering
+   * before the first sprite. Uses the same cancellation lifetime as the batch. */
+  nextFrame(): Promise<boolean> {
+    const signal = this.abort.signal;
+    if (signal.aborted || document.hidden) return Promise.resolve(false);
+    return new Promise(resolve => {
+      let frame = 0, settled = false;
+      const finish = (ready: boolean) => {
+        if (settled) return;
+        settled = true; cancelAnimationFrame(frame);
+        signal.removeEventListener('abort', aborted); resolve(ready);
+      };
+      const aborted = () => finish(false);
+      signal.addEventListener('abort', aborted, { once: true });
+      frame = requestAnimationFrame(() => finish(!signal.aborted && !document.hidden));
+    });
+  }
   play(request: DrawFlightRequest): Promise<DrawFlightResult> { return this.playBatch([request]); }
   playBatch(requests: DrawFlightRequest[]): Promise<DrawFlightResult> {
     const epoch = this.generation, signal = this.abort.signal;

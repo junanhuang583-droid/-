@@ -550,8 +550,7 @@ async function playTurnDraw(cards: QueuedCard[]): Promise<void> {
   try {
     // The same view-event pass applies card skins and the shared fan. Hidden new
     // slots already reserve final room; old cards are moving there only once.
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-    if (epoch !== animationEpoch) return;
+    if (!await deckDrawMotion.nextFrame() || epoch !== animationEpoch) return;
     const row = root.querySelector<HTMLElement>('#active-hand-target');
     if (row) await deckDrawMotion.playBatch(handDrawView.requests(row));
   } catch {
