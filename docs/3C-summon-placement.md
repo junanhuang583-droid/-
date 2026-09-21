@@ -66,3 +66,20 @@ cancellation. Sacrifice costs, targets, deathrattles and landing are untouched.
 A native held-key probe also found selection could chain into confirmation after
 focus moved; repeated Enter/Space is now rejected while a target is selected.
 Both behaviors have explicit browser regression checks; no failure is bypassed.
+
+## Post-merge failure-injection isolation
+The first main release gate (35630697264) did not deploy: all 20 new 3C cases
+and 156 unit tests passed, but an older missing-card-back case saw 20 real
+flights instead of zero. Its trace showed the service worker prefetching the
+full card back successfully (HTTP 200), then fulfilling page requests despite
+the page.route abort. The screenshot contained the successfully decoded backs.
+This is failure-injection isolation, not a summon or draw rule regression.
+
+Only that test now uses serviceWorkers: block. It additionally asserts that the
+abort route actually ran and no worker controls the page. All original zero-
+flight/private-hand/committed-card assertions remain. Real offline, cache-update
+and normal published-site tests continue with workers enabled. No application,
+asset, build, workflow, dependency or other test file changed in this correction.
+Reference: Playwright's official page.route documentation notes that service
+worker-intercepted requests bypass page routing and recommends blocking workers
+for this kind of network mock (https://playwright.dev/docs/api/class-page#page-route).
