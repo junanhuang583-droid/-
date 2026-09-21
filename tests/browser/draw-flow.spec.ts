@@ -142,15 +142,24 @@ test('3B-4 interrupted opening settles only committed private receipts and unloc
   expect((await report(page)).sources).toHaveLength(flown);
 });
 
-test('3B-4 unavailable card back during opening leaves private counts and playable committed cards',async({page})=>{
-  await page.route('**/card-back-final.webp',r=>r.abort());
-  await observe(page);await page.emulateMedia({reducedMotion:'no-preference'});await page.goto('./');
-  await expect(page.locator('#reveal-turn')).toBeVisible();
-  expect((await report(page)).sources).toHaveLength(0);
-  await expect(page.locator('#active-hand-target .hand-card')).toHaveCount(0);
-  await page.locator('#reveal-turn').click();await expect(page.locator('#end-turn')).toBeEnabled();
-  await expect(page.locator('.hand-card')).toHaveCount(12);
-  await expect(page.locator('.opening-deal-receivers')).toHaveCount(0);
+test.describe('3B-4 unavailable-art isolation',()=>{
+  // Only this failure-injection case blocks service workers: the real offline
+  // shell may otherwise fulfill the image behind page.route() and turn a
+  // missing-art test into a successful-art run. Worker/offline tests stay enabled.
+  test.use({serviceWorkers:'block'});
+  test('3B-4 unavailable card back during opening leaves private counts and playable committed cards',async({page})=>{
+    let blockedRequests = 0;
+    await page.route('**/card-back-final.webp',r=>{ ++blockedRequests; return r.abort(); });
+    await observe(page);await page.emulateMedia({reducedMotion:'no-preference'});await page.goto('./');
+    await expect(page.locator('#reveal-turn')).toBeVisible();
+    expect(blockedRequests).toBeGreaterThan(0);
+    expect(await page.evaluate(()=>navigator.serviceWorker.controller)).toBeNull();
+    expect((await report(page)).sources).toHaveLength(0);
+    await expect(page.locator('#active-hand-target .hand-card')).toHaveCount(0);
+    await page.locator('#reveal-turn').click();await expect(page.locator('#end-turn')).toBeEnabled();
+    await expect(page.locator('.hand-card')).toHaveCount(12);
+    await expect(page.locator('.opening-deal-receivers')).toHaveCount(0);
+  });
 });
 
 test('3B-4 real pending effect appears after the handoff, not behind the motion lock',async({page})=>{
