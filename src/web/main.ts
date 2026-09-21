@@ -1,6 +1,8 @@
+import { DeckSourceView } from './deck-source-view.js';
+import { OpeningDealView } from './opening-deal-view.js';
 import { HandDrawView } from './hand-draw-view.js';
 import type { QueuedCard } from "../application/card-acquisition-queue.js";
-import { battlefieldBackground, deckView, turnView, heroView } from "./battlefield-view.js";
+import { battlefieldBackground, turnView, heroView } from "./battlefield-view.js";
 import { HandoffView } from "./handoff-view.js";
 import { presentationLocked, setPresentationLocked } from "./presentation-lock.js";
 import { turnControlAriaLabel, turnControlDisabled, turnFace } from "../application/turn-control-state.js";
@@ -35,7 +37,9 @@ let animationRunning = false;
 let turnFlipAnimating = false;
 let turnFlipEpoch = 0;
 const turnMotion = new EndTurnMotion();
-const deckDrawMotion = new DeckDrawMotion();
+const deckSourceView = new DeckSourceView();
+const deckDrawMotion = new DeckDrawMotion(deckSourceView);
+const openingDealView = new OpeningDealView();
 const handDrawView = new HandDrawView();
 const handoffView = new HandoffView(() => { void revealTurnWithFlip(); });
 const clickBound = new WeakSet<HTMLElement>();
@@ -73,6 +77,11 @@ subscribeSession((reason) => {
   queueMicrotask(() => { sessionRenderQueued = false; render(); });
 });
 let animationEpoch = 0;
+if (openingDealActive) {
+  const opening = acquisitionQueue.peek();
+  deckSourceView.prepare(opening);
+  openingDealView.prepare(opening, session.state.activePlayer);
+}
 
 render();
 if (openingDealActive) void playOpeningDeal();
@@ -100,7 +109,7 @@ function render(): void {
           <div class="battlefield-future-anchor" data-battlefield-anchor="discard-future" aria-hidden="true"></div>
           <section class="battle-shell">
             <div id="public-battle-view" class="public-battle-view" tabindex="-1" aria-label="公共战场"></div>
-            <aside class="battle-rail" data-battlefield-anchor="right-rail"><div id="deck-view-mount">${deckView(state.sharedDeck.length)}</div>${turnView(turnState)}</aside>
+            <aside class="battle-rail" data-battlefield-anchor="right-rail"><div id="deck-view-mount"></div>${turnView(turnState)}</aside>
           </section>
           <section class="hand-dock" data-battlefield-anchor="hand-dock">
             <button class="stage04-hand-toggle" type="button" aria-expanded="false"><span>手牌</span><strong></strong></button>
@@ -137,7 +146,8 @@ function render(): void {
     e.textContent = session.handoffRequired || turnFlipAnimating ? "交接中"
       : `${owner === state.activePlayer ? "当前回合" : "等待"} · 手牌 ${state.players[owner].hand.length}`;
   });
-  replaceMarkup(root.querySelector<HTMLElement>("#deck-view-mount")!, deckView(state.sharedDeck.length));
+  deckSourceView.sync(root.querySelector<HTMLElement>("#deck-view-mount")!, state.sharedDeck.length);
+  if (openingDealActive) openingDealView.mount(root.querySelector<HTMLElement>('.battlefield-coordinate-layer')!);
 
   const hand = root.querySelector<HTMLElement>("#active-hand-target")!;
   hand.setAttribute("aria-hidden", String(handPrivate));
@@ -218,6 +228,8 @@ function hidePrivateHand(): void {
 }
 function discardFlyingCards(): void {
   deckDrawMotion.cancel();
+  deckSourceView.clear();
+  openingDealView.clear();
   handDrawView.clear();
   const layer = root.querySelector<HTMLElement>("#flying-card-layer");
   layer?.getAnimations({ subtree: true }).forEach(animation => animation.cancel());
@@ -390,6 +402,7 @@ async function endTurnWithFlip(): Promise<void> {
 
   selectedAttackerId = null;
   selectedHandIndex = null;
+  deckSourceView.prepare(acquisitionQueue.peek());
   notice = "回合结束，进入交接。";
   render();
   await playTurnFlip(flipEpoch);
@@ -414,10 +427,12 @@ async function revealTurnWithFlip(): Promise<void> {
   }
   if (flipEpoch !== turnFlipEpoch) { render(); return; }
 
+  openingDealView.clear();
   let drawnCards = acquisitionQueue.takeDraws(session.state.activePlayer, "turn-start")
     .flatMap(batch => batch.cards);
   if (!handDrawView.prepare(drawnCards, session.state.players[session.state.activePlayer].hand, session.state.activePlayer)) drawnCards = [];
   hiddenDrawCount = drawnCards.length;
+  if (!hiddenDrawCount) deckSourceView.clear();
   notice = `${playerLabel(session.state.activePlayer)}已接手。`;
   render();
   const completed = await playTurnFlip(flipEpoch, true);
@@ -440,7 +455,7 @@ async function playTurnFlip(epoch: number, reveal = false): Promise<boolean> {
     if (epoch === turnFlipEpoch) {
       // Cards were already drawn by the rule command. A discarded visual
       // transition must not start new cosmetic work in the background.
-      if (!completed) { hiddenDrawCount = 0; acquisitionQueue.clear(); handDrawView.clear(); }
+      if (!completed) { hiddenDrawCount = 0; acquisitionQueue.clear(); deckSourceView.clear(); handDrawView.clear(); }
       if (reveal || !completed) presentedPlayer = readSession().state.activePlayer;
       turnFlipAnimating = false;
       render();
@@ -462,6 +477,8 @@ function startNewGame(): void {
   turnFlipAnimating = false;
   resetGame();
   session = readSession();
+  deckSourceView.prepare(acquisitionQueue.peek());
+  openingDealView.prepare(acquisitionQueue.peek(), session.state.activePlayer);
   presentedPlayer = session.state.activePlayer;
   selectedHandIndex = null;
   selectedAttackerId = null;
@@ -496,45 +513,33 @@ async function playOpeningDeal(): Promise<void> {
   if (!openingDealActive || animationRunning) return;
   animationRunning = true;
   const epoch = animationEpoch;
-  await wait(reducedMotion() ? 40 : 180);
-  if (epoch !== animationEpoch) return;
-
-  const progress = () => document.querySelector<HTMLElement>("#deal-progress");
-  const opponentTarget = document.querySelector<HTMLElement>(".opponent-hero");
-  const activeTarget = document.querySelector<HTMLElement>("#active-hand-target");
-  if (!opponentTarget || !activeTarget) {
-    acquisitionQueue.clear();
-    openingDealActive = false;
-    animationRunning = false;
-    render();
-    return;
+  try {
+    await wait(reducedMotion() ? 40 : 180);
+    if (epoch !== animationEpoch) return;
+    // Prepared before the first render: retain exact journal source order rather
+    // than alternating receipts whose deckRemaining/refill facts do not alternate.
+    acquisitionQueue.takeDraws(undefined, 'opening-hand');
+    acquisitionQueue.takeDraws(session.state.activePlayer, 'turn-start');
+    const requests = openingDealView.requests();
+    const label = document.querySelector<HTMLElement>('#deal-progress');
+    if (label) label.textContent = `初始发牌与先手摸牌 · 共 ${requests.length} 张`;
+    await deckDrawMotion.playBatch(requests);
+  } catch {
+    deckDrawMotion.cancel();
+  } finally {
+    if (epoch === animationEpoch) {
+      // Cancellation/failed artwork settles already-received backs and clears
+      // all source leases. Never call drawCards or replay the saved opening.
+      acquisitionQueue.clear();
+      deckSourceView.clear();
+      openingDealView.settle();
+      finishOpeningDeal();
+      openingDealActive = false;
+      animationRunning = false;
+      notice = `发牌完成。演示牌池共 ${catalog.playableUniqueCards} 种随从。`;
+      render();
+    }
   }
-
-  const opening = acquisitionQueue.takeDraws(undefined, "opening-hand");
-  const active = session.state.activePlayer;
-  const activeCards = opening.filter(batch => batch.acquisition.playerId === active).flatMap(batch => batch.cards);
-  const opponentCards = opening.filter(batch => batch.acquisition.playerId !== active).flatMap(batch => batch.cards);
-  // Keep private opening recipients, but use one staggered source batch instead
-  // of separate serial loops. Precise public/private opening staging is 3B-4.
-  const requests: import('./deck-draw-motion.js').DrawFlightRequest[] = [];
-  for (let i = 0; i < Math.max(activeCards.length, opponentCards.length); i++) {
-    if (opponentCards[i]) requests.push({ target: opponentTarget, kind: 'opponent', occurrenceId: opponentCards[i]!.id });
-    if (activeCards[i]) requests.push({ target: activeTarget, kind: 'active', occurrenceId: activeCards[i]!.id });
-  }
-  const firstTurnCards = acquisitionQueue.takeDraws(active, 'turn-start').flatMap(batch => batch.cards);
-  requests.push(...firstTurnCards.map(card => ({ target: activeTarget, kind: 'draw' as const, occurrenceId: card.id })));
-  const label = progress();
-  if (label) label.textContent = `初始发牌与先手摸牌 · 共 ${requests.length} 张`;
-  const result = await deckDrawMotion.playBatch(requests);
-  if (epoch !== animationEpoch) return;
-  if (result !== 'completed') acquisitionQueue.clear();
-
-  if (epoch !== animationEpoch) return;
-  finishOpeningDeal();
-  openingDealActive = false;
-  animationRunning = false;
-  notice = `发牌完成。演示牌池共 ${catalog.playableUniqueCards} 种随从。`;
-  render();
 }
 
 async function playTurnDraw(cards: QueuedCard[]): Promise<void> {
@@ -553,6 +558,7 @@ async function playTurnDraw(cards: QueuedCard[]): Promise<void> {
     deckDrawMotion.cancel();
   } finally {
     if (epoch === animationEpoch) {
+      deckSourceView.clear();
       handDrawView.clear();
       hiddenDrawCount = 0;
       animationRunning = false;

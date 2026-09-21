@@ -1,3 +1,4 @@
+import { presentationLocked } from './presentation-lock.js';
 import {
   controlEffectTargets,
   currentPendingEffect,
@@ -29,7 +30,7 @@ function syncSecondWaveUi(): void {
   if (!session) return;
 
   applyControlBadges(session);
-  if (!session.handoffRequired && !session.state.winner) renderPendingEffectPicker(session);
+  if (!presentationLocked() && !session.handoffRequired && !session.state.winner) renderPendingEffectPicker(session);
   else removeChoiceOverlay();
 }
 

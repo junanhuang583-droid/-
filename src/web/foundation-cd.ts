@@ -34,7 +34,8 @@ function sync(): void {
   document.body.classList.toggle("cd-handoff-private", privateHandoff);
   shell.classList.toggle("cd-handoff-private-shell", privateHandoff);
 
-  if (privateHandoff) ensurePrivateHand(session.state.players[session.state.activePlayer].hand.length);
+  if (privateHandoff && document.querySelector('.opening-deal-receivers')) document.querySelector('#cd-private-hand')?.remove();
+  else if (privateHandoff) ensurePrivateHand(session.state.players[session.state.activePlayer].hand.length);
   else clearPrivateHand();
 
   if (!privateHandoff) decorateHand(session.state.players[session.state.activePlayer].hand);
@@ -116,7 +117,7 @@ function ensurePrivateHand(count: number): void {
     document.body.append(privateHand);
   }
 
-  const visibleBacks = Math.max(1, Math.min(count, 10));
+  const visibleBacks = Math.max(0, Math.min(count, 10));
   const key = `${visibleBacks}:${count}`;
   if (privateHand.dataset.key === key) return;
   privateHand.dataset.key = key;

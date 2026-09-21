@@ -3,6 +3,7 @@ import { DRAW_FLIGHT, DRAW_FLIGHT_HEIGHT, drawFlightFrames, planDrawFlight, quad
 import { HAND_DRAW } from '../application/hand-draw.js';
 import { V2, v2Asset } from '../application/battlefield-v2.js';
 import './deck-draw-motion.css';
+import type { DeckSourceView } from './deck-source-view.js';
 
 export type DrawFlightResult = 'completed' | 'skipped' | 'interrupted';
 export type DrawFlightKind = 'opponent' | 'active' | 'draw';
@@ -18,7 +19,7 @@ export class DeckDrawMotion {
   private abort = new AbortController();
   private cleanups = new Set<() => void>();
 
-  constructor() {
+  constructor(private readonly source: DeckSourceView) {
     window.addEventListener('resize', () => this.cancel());
     document.addEventListener('fullscreenchange', () => this.cancel());
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.cancel(); });
@@ -88,19 +89,15 @@ export class DeckDrawMotion {
     card.style.cssText = `width:${DRAW_FLIGHT.width}px;height:${DRAW_FLIGHT_HEIGHT}px;transform:${quadTransform(plan.source)}`;
     const art = new Image(); art.src = v2Asset('card-back-final'); art.alt = ''; art.draggable = false;
     card.append(art); stage.append(card);
-    const top = socket.querySelector<HTMLElement>('.v2-deck-slice:last-child');
-    const previousVisibility = top?.style.visibility ?? '';
-    let borrowed = false, frame = 0, motion: Animation | null = null, shade: Animation | null = null;
-    const releaseTop = () => {
-      if (borrowed && top) { top.style.visibility = previousVisibility; borrowed = false; }
-      sourceFree();
-    };
+    const lease = this.source.borrow(request.occurrenceId);
+    if (!lease) { sourceFree(); return 'skipped'; }
+    let frame = 0, motion: Animation | null = null, shade: Animation | null = null;
+    const releaseTop = () => { lease.release(); sourceFree(); };
     const cleanup = () => {
       cancelAnimationFrame(frame); motion?.cancel(); shade?.cancel(); releaseTop(); stage.remove();
     };
     this.cleanups.add(cleanup);
     try {
-      if (top) { top.style.visibility = 'hidden'; borrowed = true; }
       socket.append(stage);
       motion = card.animate(drawFlightFrames(plan), { duration: plan.duration, fill: 'both', easing: 'linear' });
       motion.id = 'deck-card-exit-flight';

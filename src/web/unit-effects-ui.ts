@@ -1,3 +1,5 @@
+import { presentationLocked } from './presentation-lock.js';
+import { onViewRendered } from './view-events.js';
 import { currentPendingUnitEffect, unitEffectTargets, type BasicGameSession, type UnitEffectTarget as TargetView } from "../core/basic-game.js";
 import type { PendingUnitEffect } from "../core/deathrattle-effects.js";
 import { otherPlayer } from "../core/unit-targeting.js";
@@ -8,10 +10,11 @@ import { dispatchGame, readSession, subscribeSession } from "./session-runtime.j
 installStyles();
 subscribeSession(() => queueMicrotask(sync));
 queueMicrotask(sync);
+onViewRendered(sync, 65);
 function sync(): void {
   const session = readSession();
   const effect = currentPendingUnitEffect(session);
-  if (session.handoffRequired || !effect) { removeOurOverlay(); return; }
+  if (presentationLocked() || session.handoffRequired || session.state.winner || !effect) { removeOurOverlay(); return; }
   renderEffectPicker(session, effect);
 }
 
