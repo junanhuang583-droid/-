@@ -1,0 +1,41 @@
+/* Summon-only luminous guides. These decorate children, never paint a permanent
+ * socket or override the owning board's position, size, transform or z-index. */
+.summon-placement-mark {
+  --placement-light:#a7d9df;
+  position:absolute; inset:3px; display:block; pointer-events:none;
+  color:var(--placement-light); opacity:.76;
+  animation:summon-guide-in 120ms ease-out both;
+}
+.summon-placement-corners {
+  position:absolute; inset:8% 3% 17%; display:block; border-radius:4px;
+  background:
+    linear-gradient(currentColor,currentColor) left top / 13px 2px no-repeat,
+    linear-gradient(currentColor,currentColor) left top / 2px 13px no-repeat,
+    linear-gradient(currentColor,currentColor) right top / 13px 2px no-repeat,
+    linear-gradient(currentColor,currentColor) right top / 2px 13px no-repeat,
+    linear-gradient(currentColor,currentColor) left bottom / 13px 2px no-repeat,
+    linear-gradient(currentColor,currentColor) left bottom / 2px 13px no-repeat,
+    linear-gradient(currentColor,currentColor) right bottom / 13px 2px no-repeat,
+    linear-gradient(currentColor,currentColor) right bottom / 2px 13px no-repeat;
+  filter:drop-shadow(0 0 3px #7cccd88c);
+  transition:inset 100ms ease-out;
+}
+.summon-placement-spark {
+  position:absolute; left:50%; top:42%; width:7px; height:7px;
+  border:1px solid currentColor; transform:translate(-50%,-50%) rotate(45deg);
+}
+.summon-placement-caption {
+  position:absolute; bottom:0; left:50%; transform:translateX(-50%);
+  display:block; opacity:1; font-size:10px; line-height:1.2; font-weight:600; white-space:nowrap;
+  text-shadow:0 1px 3px #05090d;
+}
+[data-summon-target="true"] > .summon-placement-mark { --placement-light:#ffdf97; opacity:1; }
+[data-summon-target="true"] .summon-placement-corners { inset:3% 0 12%; filter:drop-shadow(0 0 5px #f4c572b3); }
+[data-summon-target="true"] .summon-placement-spark { background:currentColor; }
+[data-summon-mode="sacrifice"] .summon-placement-mark { --placement-light:#e7b589; inset:-5px; }
+[data-summon-mode="sacrifice"] .summon-placement-spark { display:none; }
+@keyframes summon-guide-in { from { opacity:0; } to { opacity:1; } }
+@media (prefers-reduced-motion:reduce) {
+  .summon-placement-mark { animation:none; }
+  .summon-placement-corners { transition:none; }
+}

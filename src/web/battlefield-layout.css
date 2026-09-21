@@ -64,16 +64,12 @@ body { min-width: 320px; background: #080b10; }
   transition: left .14s ease;
 }
 .board-row > .empty-slot {
-  display: none; left: calc(50% + var(--battle-slot-index, 0) * var(--unit-step));
-  border-radius: 50%; border: 1px solid #bca16e88;
-  background: radial-gradient(circle, #c29a5225, #c29a5206 60%, transparent 72%);
-  box-shadow: none;
+  display:none; left:calc(50% + var(--battle-slot-index, 0) * var(--unit-step));
+  border:0; border-radius:0; background:none; box-shadow:none; opacity:1;
 }
-.empty-slot > span, .empty-slot > small, .slot-number { display: none; }
-.active-board.summon-mode .empty-slot.summon-ready,
-body.ab-hand-gesture-active .active-board .empty-slot { display: grid; }
-.active-board.summon-mode .minion,
-body.ab-hand-gesture-active .active-board .minion { left: calc(50% + var(--battle-slot-index, 0) * var(--unit-step)); }
+.empty-slot > span:not(.summon-placement-mark), .empty-slot > small, .slot-number { display:none; }
+.active-board[data-summon-mode="direct"] .empty-slot[data-summon-legal="true"] { display:block; }
+.active-board[data-summon-mode] .minion { left:calc(50% + var(--battle-slot-index, 0) * var(--unit-step)); }
 .opponent-board .empty-slot { display: none; }
 .board-row .minion-art { width: calc(var(--unit-width) * .64); height: calc(var(--unit-width) * .64); }
 .board-row .minion > strong { max-width: 100%; min-height: 0; font-size: 7px; padding: 2px 4px; margin-top: -3px; }

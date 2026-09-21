@@ -197,14 +197,15 @@ export function getSummonRequirement(card: MinionCardDefinition): SummonRequirem
   return { healthCost, sacrificeCount, unsupportedReason: null };
 }
 
-export function summonFromHand(
+/** Read-only legality shared by commands and temporary placement previews.
+ * No costs, deaths, random IDs, timestamps or acquisition records are produced. */
+export function validateSummonFromHand(
   session: BasicGameSession,
   catalog: BasicGameCatalog,
   handIndex: number,
   slotIndex: number,
   sacrificeInstanceIds: string[] = [],
 ): string | null {
-  ensureSessionExtensions(session);
   if (session.state.winner) return "对局已经结束。";
   if (session.handoffRequired) return "请先完成回合交接。";
   if (hasPendingEffects(session)) return "请先结算当前待处理的亡语效果。";
@@ -239,6 +240,25 @@ export function summonFromHand(
   } else if (sacrifices.length > 0) {
     return "这张牌不需要献祭随从。";
   }
+
+  return null;
+}
+
+export function summonFromHand(
+  session: BasicGameSession,
+  catalog: BasicGameCatalog,
+  handIndex: number,
+  slotIndex: number,
+  sacrificeInstanceIds: string[] = [],
+): string | null {
+  ensureSessionExtensions(session);
+  const error = validateSummonFromHand(session, catalog, handIndex, slotIndex, sacrificeInstanceIds);
+  if (error) return error;
+  const player = session.state.players[session.state.activePlayer];
+  const cardId = player.hand[handIndex]!;
+  const card = catalog.cards.get(cardId)!;
+  const summonRule = getSummonRequirement(card);
+  const sacrifices = [...new Set(sacrificeInstanceIds)];
 
   player.hand.splice(handIndex, 1);
 
