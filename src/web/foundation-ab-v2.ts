@@ -1,8 +1,9 @@
+import { summonOptions } from '../core/summon-options.js';
+import { SummonPlacementView } from './summon-placement-view.js';
 import { applyHandFan } from './hand-fan-view.js';
 import { presentationLocked, onPresentationLock } from "./presentation-lock.js";
 import {
-  canMinionAttack,
-  getSummonRequirement
+  canMinionAttack
 } from "../core/basic-game.js";
 import { PROTOTYPE_SPECIAL_BY_ID } from "../data/prototype-special-cards.js";
 import type { CardId } from "../model/cards.js";
@@ -10,7 +11,7 @@ import type { MinionInstance, PlayerId, StatusState } from "../model/state.js";
 import "./foundation-ab-v2.css";
 import "./foundation-ab.css";
 import { byId, catalog } from "./game-catalog.js";
-import { dispatchGame, readSession } from "./session-runtime.js";
+import { dispatchGame, readSession, subscribeSession } from "./session-runtime.js";
 import { onViewRendered } from "./view-events.js";
 
 
@@ -38,6 +39,8 @@ let scheduled = false;
 let bypassMinionInspector = false;
 let handExpanded = false;
 let lastActivePlayer: PlayerId | null = null;
+const placement = new SummonPlacementView();
+let keyboardPlacement: { handIndex: number; cardId: CardId; source: HTMLElement } | null = null;
 
 document.body.classList.add("foundation-ab-enabled", "foundation-ab-v2-enabled");
 onViewRendered(syncFoundation, 40);
@@ -47,12 +50,26 @@ document.addEventListener("pointerdown", onPointerDown, true);
 document.addEventListener("pointermove", onPointerMove, { capture: true, passive: false });
 document.addEventListener("pointerup", onPointerUp, true);
 document.addEventListener("pointercancel", onPointerCancel, true);
+document.addEventListener("click", onPlacementClick, true);
+document.addEventListener("keydown", onPlacementKey, true);
+document.addEventListener("focusin", event => {
+  if (keyboardPlacement && event.target instanceof HTMLElement) placement.highlight(event.target.closest('[data-summon-legal]'));
+}, true);
 document.addEventListener("click", onHandToggleClick, true);
 document.addEventListener("click", onMinionClick, true);
 document.addEventListener("click", suppressLegacyHandClick, true);
 document.addEventListener("click", closeInspectorFromOutside, true);
+subscribeSession(() => cancelPlacement());
+window.addEventListener('blur', () => cancelPlacement());
+window.addEventListener('resize', () => cancelPlacement());
+window.addEventListener('pagehide', () => cancelPlacement());
+document.addEventListener('fullscreenchange', () => cancelPlacement());
+document.addEventListener('visibilitychange', () => { if (document.hidden) cancelPlacement(); });
+document.addEventListener('lostpointercapture', event => {
+  if (gesture?.pointerId === event.pointerId) cleanupGesture();
+}, true);
 onPresentationLock(() => {
-  cleanupGesture(); closeMinionInspector(); removeLegacyPreviews(); setHandExpanded(false);
+  cancelPlacement(); closeMinionInspector(); removeLegacyPreviews(); setHandExpanded(false);
 });
 scheduleSync();
 
@@ -122,6 +139,7 @@ function onPointerDown(event: PointerEvent): void {
   const cardId = session.state.players[session.state.activePlayer].hand[handIndex];
   if (!cardId) return;
 
+  cancelPlacement();
   closeMinionInspector();
   setHandExpanded(true);
   gesture = {
@@ -172,9 +190,9 @@ function scheduleGestureFrame(): void {
     gestureFrame = 0;
     if (!gesture?.lifted) return;
     updateGestureMode(gesture);
-    updateLiftedCardPosition(gesture);
     if (gesture.mode === "play") updateDropTarget(gesture);
     else clearDropTarget(gesture);
+    updateLiftedCardPosition(gesture);
   });
 }
 
@@ -215,15 +233,11 @@ function updateGestureLabel(current: HandGesture): void {
     label.textContent = "查看中 · 继续向上拖进入出牌";
     return;
   }
-  const minion = byId.get(current.cardId);
-  if (!minion) {
-    label.textContent = "此牌当前仅可查看";
-    return;
-  }
-  const requirement = getSummonRequirement(minion);
-  if (requirement.unsupportedReason) label.textContent = "出牌条件尚未完成";
-  else if (requirement.sacrificeCount > 0) label.textContent = current.sacrificeReady ? "出牌 · 松手选择祭品" : "出牌 · 拖入己方战场";
-  else label.textContent = current.dropSlot ? "出牌 · 松手召唤" : "出牌 · 拖到亮起的空位";
+  const options = summonOptions(readSession(), catalog, current.handIndex, current.cardId);
+  if (options.kind === 'blocked') label.textContent = options.reason;
+  else if (options.kind === 'sacrifice') label.textContent = current.sacrificeReady
+    ? `松手选择${options.count}只祭品` : '献祭召唤 · 拖入己方战场';
+  else label.textContent = current.dropSlot ? `松手召唤 · ${Number(current.dropSlot.dataset.emptySlot)+1}号位` : '出牌 · 拖到亮起的空位';
 }
 
 function onPointerUp(event: PointerEvent): void {
@@ -231,7 +245,10 @@ function onPointerUp(event: PointerEvent): void {
   const current = gesture;
   if (current.lifted) {
     event.preventDefault();
-    if (current.mode === "play") resolveGestureDrop(current);
+    // Resolve the actual release position, not a target cached by an older rAF.
+    current.x = event.clientX; current.y = event.clientY;
+    updateGestureMode(current);
+    if (current.mode === "play") { updateDropTarget(current); resolveGestureDrop(current); }
   }
   cleanupGesture();
 }
@@ -243,71 +260,91 @@ function onPointerCancel(event: PointerEvent): void {
 
 function resolveGestureDrop(current: HandGesture): void {
   if (presentationLocked()) return;
-  const session = readSession();
-  if (presentationLocked() || !session || session.handoffRequired || session.state.winner) return;
-  const active = session.state.activePlayer;
-  const currentCardId = session.state.players[active].hand[current.handIndex];
-  if (currentCardId !== current.cardId) return;
-
-  const minion = byId.get(current.cardId);
-  if (minion) {
-    const requirement = getSummonRequirement(minion);
-    if (requirement.unsupportedReason) {
-      showToast(requirement.unsupportedReason);
-      return;
-    }
-    if (requirement.sacrificeCount > 0) {
-      if (current.sacrificeReady) {
-        window.dispatchEvent(new CustomEvent("cardgame:request-sacrifice", { detail: { handIndex: current.handIndex } }));
-      }
-      return;
-    }
-    if (!current.dropSlot) return;
-    const slotIndex = Number(current.dropSlot.dataset.emptySlot);
-    if (!Number.isInteger(slotIndex)) return;
-    const error = dispatchGame({ type: "summon", handIndex: current.handIndex, slotIndex, cardId: current.cardId });
-    if (error) {
-      showToast(error);
-      return;
-    }
-
-    showToast(`已召唤「${minion.name}」。`);
+  const options = summonOptions(readSession(), catalog, current.handIndex, current.cardId);
+  if (options.kind === 'blocked') { showToast(options.reason); return; }
+  if (options.kind === 'sacrifice') {
+    if (current.sacrificeReady) window.dispatchEvent(new CustomEvent('cardgame:request-sacrifice', { detail: { handIndex: current.handIndex } }));
     return;
   }
-
-  const special = PROTOTYPE_SPECIAL_BY_ID.get(current.cardId);
-  if (special) showToast(`「${special.name}」当前仅可查看，效果尚未进入出牌实现。`);
+  const slot = current.dropSlot?.dataset.emptySlot;
+  if (slot === undefined || !options.slots.includes(Number(slot))) return;
+  const error = dispatchGame({ type: 'summon', handIndex: current.handIndex, cardId: current.cardId, slotIndex: Number(slot) });
+  if (error) showToast(error);
 }
 
 function updateDropTarget(current: HandGesture): void {
-  clearDropTarget(current);
-  const minion = byId.get(current.cardId);
-  if (!minion) return;
-  const requirement = getSummonRequirement(minion);
-  if (requirement.unsupportedReason) return;
-
-  const element = document.elementFromPoint(current.x, current.y);
-  if (!(element instanceof Element)) return;
-  if (requirement.sacrificeCount > 0) {
-    const board = element.closest<HTMLElement>(".active-board");
-    if (board) {
-      current.sacrificeReady = true;
-      board.classList.add("ab-sacrifice-drop-ready");
-    }
-    return;
+  current.dropSlot = null; current.sacrificeReady = false;
+  const options = summonOptions(readSession(), catalog, current.handIndex, current.cardId);
+  placement.show(options);
+  const hit = placement.hit(current.x, current.y);
+  placement.highlight(hit);
+  if (options.kind === 'direct') current.dropSlot = hit;
+  else if (options.kind === 'sacrifice') {
+    const board = document.querySelector<HTMLElement>('.active-board')?.getBoundingClientRect();
+    current.sacrificeReady = Boolean(board && current.x >= board.left && current.x <= board.right && current.y >= board.top && current.y <= board.bottom);
   }
-
-  const slot = element.closest<HTMLElement>(".active-board [data-empty-slot]");
-  if (!slot || slot.hasAttribute("disabled")) return;
-  current.dropSlot = slot;
-  slot.classList.add("ab-drop-target");
 }
 
 function clearDropTarget(current: HandGesture): void {
-  current.dropSlot?.classList.remove("ab-drop-target");
-  current.dropSlot = null;
-  current.sacrificeReady = false;
-  document.querySelector(".active-board")?.classList.remove("ab-sacrifice-drop-ready");
+  current.dropSlot = null; current.sacrificeReady = false;
+  placement.clear();
+}
+
+function cancelPlacement(restoreFocus = false): void {
+  const source = keyboardPlacement?.source;
+  keyboardPlacement = null;
+  cleanupGesture(); placement.clear();
+  if (restoreFocus && source?.isConnected) source.focus({ preventScroll: true });
+}
+
+/** Native keyboard selection supplements the existing swipe-to-view/drag-to-play
+ * touch gesture. Tap/ordinary click on a hand keeps its existing semantics. */
+function onPlacementKey(event: KeyboardEvent): void {
+  if (event.key === 'Escape' && (gesture || keyboardPlacement)) {
+    event.preventDefault(); event.stopImmediatePropagation(); cancelPlacement(true); return;
+  }
+  if (presentationLocked()) return;
+  // Holding the selection key must not confirm the newly focused slot.
+  if (keyboardPlacement && event.repeat && ['Enter', ' '].includes(event.key)) {
+    event.preventDefault(); event.stopImmediatePropagation(); return;
+  }
+  const target = event.target instanceof Element ? event.target : null;
+  if (keyboardPlacement && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+    const slots = [...document.querySelectorAll<HTMLElement>('.active-board [data-summon-legal]')];
+    const index = slots.indexOf(document.activeElement as HTMLElement);
+    const next = slots[(index + (event.key === 'ArrowRight' ? 1 : slots.length-1)) % slots.length];
+    if (next) { event.preventDefault(); next.focus({ preventScroll: true }); }
+    return;
+  }
+  if (!['Enter', ' '].includes(event.key) || !target?.closest('#active-hand-target .hand-card')) return;
+  event.preventDefault(); event.stopImmediatePropagation();
+  if (event.repeat || document.querySelector('#sacrifice-placement-overlay,#rule-choice-overlay,#unit-effect-overlay')) return;
+  const source = target.closest<HTMLButtonElement>('.hand-card')!;
+  if (source.disabled) return;
+  const handIndex = resolveHandIndex(source), cardId = readSession().state.players[readSession().state.activePlayer].hand[handIndex];
+  cancelPlacement();
+  if (!cardId) return;
+  const options = summonOptions(readSession(), catalog, handIndex, cardId);
+  if (options.kind === 'blocked') { showToast(options.reason); return; }
+  if (options.kind === 'sacrifice') {
+    window.dispatchEvent(new CustomEvent('cardgame:request-sacrifice', { detail: { handIndex } })); return;
+  }
+  keyboardPlacement = { handIndex, cardId, source };
+  placement.show(options); placement.first()?.focus({ preventScroll: true });
+}
+
+function onPlacementClick(event: MouseEvent): void {
+  if (!keyboardPlacement) return;
+  const target = event.target instanceof Element ? event.target : null;
+  const slot = target?.closest<HTMLElement>('.active-board [data-empty-slot][data-summon-legal]');
+  if (!slot) { cancelPlacement(); return; }
+  event.preventDefault(); event.stopImmediatePropagation();
+  const intent = keyboardPlacement, slotIndex = Number(slot.dataset.emptySlot);
+  const options = summonOptions(readSession(), catalog, intent.handIndex, intent.cardId);
+  cancelPlacement();
+  if (presentationLocked() || options.kind !== 'direct' || !options.slots.includes(slotIndex)) return;
+  const error = dispatchGame({ type: 'summon', handIndex: intent.handIndex, cardId: intent.cardId, slotIndex });
+  if (error) showToast(error);
 }
 
 function createLiftedCard(cardId: CardId): HTMLElement {
@@ -372,6 +409,7 @@ function onHandToggleClick(event: MouseEvent): void {
 }
 
 function onGlobalHandPointerDown(event: PointerEvent): void {
+  if (keyboardPlacement && (!(event.target instanceof Element) || !event.target.closest('[data-summon-legal]'))) cancelPlacement();
   if (!handExpanded || gesture) return;
   const target = event.target;
   if (!(target instanceof Element)) return;
@@ -577,17 +615,16 @@ function clearHandFocus(): void {
 }
 
 function cleanupGesture(): void {
-  if (!gesture) return;
-  const collapseAfterPlay = gesture.lifted && gesture.mode === "play";
+  const current = gesture;
+  if (!current) return;
+  gesture = null;
+  const collapseAfterPlay = current.lifted && current.mode === 'play';
   if (gestureFrame) cancelAnimationFrame(gestureFrame);
   gestureFrame = 0;
-  gesture.source.classList.remove("ab-touching", "ab-drag-source");
-  clearHandFocus();
-  clearDropTarget(gesture);
-  gesture.ghost?.remove();
-  document.body.classList.remove("ab-hand-peek-active", "ab-hand-gesture-active");
-  try { gesture.source.releasePointerCapture(gesture.pointerId); } catch { /* optional */ }
-  gesture = null;
+  current.source.classList.remove('ab-touching', 'ab-drag-source');
+  clearHandFocus(); clearDropTarget(current); current.ghost?.remove();
+  document.body.classList.remove('ab-hand-peek-active', 'ab-hand-gesture-active');
+  try { current.source.releasePointerCapture(current.pointerId); } catch { /* optional */ }
   if (collapseAfterPlay) setHandExpanded(false);
 }
 

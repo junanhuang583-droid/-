@@ -1,0 +1,40 @@
+/* Existing sacrifice confirmation, with an explicit native-modal layer.
+ * No board/hand geometry or rule ownership is changed. */
+.sacrifice-placement-overlay {
+  position:fixed; inset:0; margin:auto; padding:16px; box-sizing:border-box;
+  width:min(720px,calc(100vw - 28px)); max-height:calc(100dvh - 24px);
+  border:1px solid #9c815a; border-radius:10px; overflow:auto;
+  background:#191b20; color:#ecdfc8; font:inherit; box-shadow:0 10px 30px #0008;
+}
+.sacrifice-placement-overlay::backdrop { background:#0509114d; backdrop-filter:none; }
+.sacrifice-kicker { font-size:10px; color:#c9ae83; }
+.sacrifice-placement-card h2 { margin:6px 0; font-size:20px; }
+.sacrifice-placement-card p { margin:0 0 14px; color:#c3b9a8; font-size:12px; line-height:1.5; }
+.sacrifice-placement-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:7px; }
+.sacrifice-placement-option {
+  display:flex; flex-direction:column; align-items:flex-start; gap:5px;
+  min-height:88px; padding:9px; border:1px solid #746047; border-radius:6px;
+  background:#2c2822; color:#e9dbc6; font:inherit; cursor:pointer; text-align:left;
+}
+.sacrifice-placement-option small { font-size:10px; color:#b7a58b; }
+.sacrifice-placement-option strong { font-size:13px; }
+.sacrifice-placement-option span { font-size:11px; }
+.sacrifice-placement-option em { visibility:hidden; font-size:10px; color:#ffdea0; font-style:normal; }
+.sacrifice-placement-option.selected { border-color:#ecc68b; background:#51412b; }
+.sacrifice-placement-option.destination em { visibility:visible; }
+.sacrifice-placement-footer { display:flex; align-items:center; gap:8px; margin-top:14px; font-size:12px; }
+.sacrifice-placement-footer > span { margin-right:auto; }
+.sacrifice-placement-footer button {
+  padding:8px 12px; border:1px solid #897251; border-radius:5px;
+  background:#342d23; color:#f4e2c0; font:inherit; cursor:pointer;
+}
+.sacrifice-placement-footer button:disabled { opacity:.4; cursor:default; }
+.sacrifice-placement-overlay button:focus-visible { outline:2px solid #f6d598; outline-offset:2px; }
+.sacrifice-placement-error { padding:7px 9px; margin-bottom:8px; color:#ffd8c8; background:#542d25; border-radius:5px; font-size:12px; }
+@media (max-height:400px) {
+  .sacrifice-placement-overlay { padding:10px 12px; }
+  .sacrifice-placement-card p { margin-bottom:8px; }
+  .sacrifice-placement-option { min-height:64px; padding:6px; gap:3px; }
+  .sacrifice-placement-footer { margin-top:8px; }
+}
+@media (max-width:500px) { .sacrifice-placement-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
