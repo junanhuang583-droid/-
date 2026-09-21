@@ -50,6 +50,12 @@ const observation = (page) => page.evaluate(() => {
   const { sources, fronts, frames, privateLeak } = window.__drawRelease;
   return { sources, fronts, frames, privateLeak };
 });
+// A short-lived first node can already be edge-on/hidden when a polling
+// locator runs. Wait for the passive observer's durable receipt AND rAF sample
+// instead of missing an otherwise completed batch. All motion assertions below
+// still run against the full captured sequence; no timeout is waived.
+const waitForObservedFlight = (page) => page.waitForFunction(() =>
+  window.__drawRelease.sources.length > 0 && window.__drawRelease.frames.length > 0);
 function motionChecks(data, count) {
   assert.equal(data.sources.length, count, 'Actual flight count differs from committed draws');
   assert.equal(new Set(data.sources.map(s => s.id)).size, count, 'Duplicated receipt flight');
@@ -78,7 +84,7 @@ export async function checkDrawRelease(browser, url, expected, output) {
         assert.equal(report.info.sourceCommit,expected,'Wrong published draw build');
         await page.addInitScript(installObserver);
         await page.goto(url,{waitUntil:'load'});
-        await page.locator('.deck-draw-card').first().waitFor();
+        await waitForObservedFlight(page);
         const initial = await read(page);
         await page.screenshot({path:join(output,`${width}x${height}-draw-opening.png`)});
         await page.locator('#reveal-turn').waitFor();
@@ -115,7 +121,7 @@ export async function checkDrawRelease(browser, url, expected, output) {
           const committed=await read(page),owner=committed.state.activePlayer;
           const old=before.state.players[owner].hand.length,ids=committed.state.players[owner].hand.slice(old);
           assert.equal(ids.length,count);assert.equal((await observation(page)).sources.length,0);
-          await page.locator('#reveal-turn').click();await page.locator('.deck-draw-card').first().waitFor();
+          await page.locator('#reveal-turn').click();await waitForObservedFlight(page);
           await page.screenshot({path:join(output,`${width}x${height}-draw-${count}-moving.png`)});
           await page.locator('#end-turn:not(:disabled)').waitFor();
           const data=await observation(page);report.turns.push({count,ids,...data});motionChecks(data,count);
