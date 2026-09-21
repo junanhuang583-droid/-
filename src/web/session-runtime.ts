@@ -1,3 +1,5 @@
+import { AcquisitionJournal } from '../core/card-acquisition.js';
+import { CardAcquisitionQueue } from '../application/card-acquisition-queue.js';
 import { GameStore, type SessionListener } from "../application/game-store.js";
 import { migrateLegacyEffects } from "../application/session-migration.js";
 import { createBasicGame, settlePendingEffects } from "../core/basic-game.js";
@@ -28,7 +30,9 @@ if (restored) {
   }
 }
 export const wasSessionRestored = restored !== null;
-export const gameStore = new GameStore(restored ?? createBasicGame(cards), (session) => {
+const openingResults = new AcquisitionJournal();
+const initialSession = restored ?? createBasicGame(cards, Math.random, openingResults);
+export const gameStore = new GameStore(initialSession, (session) => {
   try { persistSession(localStorage, session); storageWarning = ""; }
   catch (error) {
     storageWarning = "自动保存失败；当前对局仍在内存中，请不要关闭页面。";
@@ -36,6 +40,12 @@ export const gameStore = new GameStore(restored ?? createBasicGame(cards), (sess
     throw error;
   }
 });
+// Subscribe before UI observers. New-game results are accepted only after the
+// store commits; restored/external sessions never reconstruct historical receipts.
+export const acquisitionQueue = new CardAcquisitionQueue();
+acquisitionQueue.accept({ reason: "new-game", gameId: initialSession.gameId,
+  revision: initialSession.revision ?? 0, acquisitions: wasSessionRestored ? [] : openingResults.read() });
+gameStore.subscribe((_reason, commit) => acquisitionQueue.accept(commit));
 export const readSession = () => gameStore.read();
 export const subscribeSession = (listener: SessionListener) => gameStore.subscribe(listener);
 export const persistenceWarning = () => storageWarning;
@@ -44,9 +54,13 @@ export function dispatchGame(command: GameCommand): string | null {
     const disk = parseStored(localStorage.getItem(SAVE_KEY));
     if (disk && gameStore.acceptExternal(disk)) return "对局已在另一窗口更新，请根据最新状态重新操作。";
   } catch { /* The in-memory game remains playable while storage is unavailable. */ }
-  return gameStore.dispatch((draft) => applyCommand(draft, catalog, command));
+  return gameStore.dispatch((draft, acquisitions) => applyCommand(draft, catalog, command, acquisitions));
 }
-export function resetGame(): void { gameStore.replace(createBasicGame(cards)); }
+export function resetGame(): void {
+  const acquisitions = new AcquisitionJournal();
+  const next = createBasicGame(cards, Math.random, acquisitions);
+  gameStore.replace(next, acquisitions.read());
+}
 
 /** Demo extras stay after opening draws, as in the existing prototype. */
 export function finishOpeningDeal(): void {

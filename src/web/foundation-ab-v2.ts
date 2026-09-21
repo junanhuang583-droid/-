@@ -1,3 +1,4 @@
+import { applyHandFan } from './hand-fan-view.js';
 import { presentationLocked, onPresentationLock } from "./presentation-lock.js";
 import {
   canMinionAttack,
@@ -102,30 +103,7 @@ function markSide(selector: string, playerId: PlayerId): void {
 
 function fanHand(): void {
   const row = document.querySelector<HTMLElement>("#active-hand-target");
-  if (!row) return;
-  const handCards = [...row.querySelectorAll<HTMLElement>(".hand-card")];
-  const count = handCards.length;
-  if (count === 0) return;
-
-  const rowWidth = row.clientWidth;
-  const available = Math.max(260, rowWidth > 0 ? rowWidth - 12 : Math.min(window.innerWidth * 0.82, 980));
-  const baseWidth = window.innerHeight <= 500 ? 82 : window.innerWidth >= 1100 ? 104 : 92;
-  const natural = count * baseWidth;
-  const maxOverlapRatio = count >= 20 ? 0.90 : count >= 14 ? 0.84 : 0.78;
-  const overlap = count > 1 ? clamp((natural - available) / (count - 1), 0, baseWidth * maxOverlapRatio) : 0;
-  const center = (count - 1) / 2;
-  const angleStep = count <= 8 ? 2.05 : count <= 13 ? 1.35 : count <= 20 ? 0.82 : 0.58;
-  const edgeDrop = count >= 20 ? 5 : count >= 14 ? 7 : 9;
-
-  handCards.forEach((card, index) => {
-    const distance = index - center;
-    card.style.setProperty("--ab-width", `${baseWidth}px`);
-    card.style.setProperty("--ab-overlap", index === 0 ? "0px" : `${-overlap}px`);
-    card.style.setProperty("--ab-angle", `${clamp(distance * angleStep, -9, 9)}deg`);
-    card.style.setProperty("--ab-y", `${Math.min(edgeDrop, Math.abs(distance) * 0.95)}px`);
-    card.style.setProperty("--ab-z", String(100 - Math.round(Math.abs(distance))));
-    card.style.removeProperty("--stage04-focus-x");
-  });
+  if (row) applyHandFan(row);
 }
 
 function onPointerDown(event: PointerEvent): void {

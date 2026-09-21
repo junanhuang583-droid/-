@@ -2,6 +2,7 @@ import { chromium } from "@playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 import { checkTurnRelease } from "./check-turn-release.mjs";
+import { checkDrawRelease } from "./check-draw-release.mjs";
 
 const [url, expected] = process.argv.slice(2);
 assert(url && expected, "Provide the Pages URL and expected source SHA");
@@ -121,6 +122,7 @@ try {
     } finally { await context.close(); }
   }
   await checkTurnRelease(browser, origin.href, expected, output);
+  await checkDrawRelease(browser, origin.href, expected, output);
 } finally {
   await writeFile(`${output}/results.json`, JSON.stringify({ sourceCommit: expected, results }, null, 2));
   await browser.close();

@@ -1,3 +1,4 @@
+import type { AcquisitionJournal, DrawReason, DrawnCard } from './card-acquisition.js';
 import type { CardId, Keyword, MinionCardDefinition } from "../model/cards.js";
 import type { GameState, MinionInstance, PlayerId, PlayerState, StatusState } from "../model/state.js";
 import { parseUnitDeathrattle, type PendingUnitEffect } from "./deathrattle-effects.js";
@@ -101,6 +102,7 @@ export function createCatalog(cards: MinionCardDefinition[]): BasicGameCatalog {
 export function createBasicGame(
   cards: MinionCardDefinition[],
   random: () => number = Math.random,
+  acquisitions?: AcquisitionJournal,
 ): BasicGameSession {
   const catalog = createCatalog(cards);
   const deck: CardId[] = [];
@@ -138,9 +140,9 @@ export function createBasicGame(
     pendingEffects: [],
   };
 
-  drawCards(session, "P1", RULES_CORE_V1.startingHandSize, random);
-  drawCards(session, "P2", RULES_CORE_V1.startingHandSize, random);
-  beginTurn(session, firstPlayer, random);
+  drawCards(session, "P1", RULES_CORE_V1.startingHandSize, random, acquisitions, "opening-hand");
+  drawCards(session, "P2", RULES_CORE_V1.startingHandSize, random, acquisitions, "opening-hand");
+  beginTurn(session, firstPlayer, random, acquisitions);
   log(session, `新对局开始，${playerName(firstPlayer)}先手。`);
   log(session, "已启用底层规则：扣血召唤、迅疾、快攻、嘲讽、狂妄、守护、甲一/甲二、吸血、献祭、死亡记录、可自动判定的亡语、汲取底层与沉睡/冰冻/石化状态。进化、装备和场景仍未启用。");
   log(session, `演示牌池载入 ${catalog.playableUniqueCards} 种、共 ${catalog.playableDeckSize} 张可运行随从。未知卡牌数量只在本演示牌池临时按 1 张使用，不写回正式卡牌记录。`);
@@ -440,6 +442,7 @@ export function isControlStatusActive(
 export function endTurn(
   session: BasicGameSession,
   random: () => number = Math.random,
+  acquisitions?: AcquisitionJournal,
 ): string | null {
   ensureSessionExtensions(session);
   if (session.state.winner) return "对局已经结束。";
@@ -449,7 +452,7 @@ export function endTurn(
   const previous = session.state.activePlayer;
   const next = otherPlayer(previous);
   session.state.turn += 1;
-  beginTurn(session, next, random);
+  beginTurn(session, next, random, acquisitions);
   session.handoffRequired = true;
   log(session, `${playerName(previous)}结束回合，轮到${playerName(next)}。`);
   touch(session);
@@ -464,7 +467,7 @@ export function canMinionAttack(
   return validateAttacker(session, catalog ?? null, { minion, slotIndex: -1 }) === null;
 }
 
-function beginTurn(session: BasicGameSession, playerId: PlayerId, random: () => number): void {
+function beginTurn(session: BasicGameSession, playerId: PlayerId, random: () => number, acquisitions?: AcquisitionJournal): void {
   ensureSessionExtensions(session);
   session.state.activePlayer = playerId;
   const player = session.state.players[playerId];
@@ -482,28 +485,36 @@ function beginTurn(session: BasicGameSession, playerId: PlayerId, random: () => 
   const drawCount = isSecondPlayer && startedBefore === 0
     ? RULES_CORE_V1.secondPlayerFirstDraw
     : RULES_CORE_V1.normalDrawPerTurn;
-  drawCards(session, playerId, drawCount, random);
+  drawCards(session, playerId, drawCount, random, acquisitions, "turn-start");
 }
 
-function drawCards(
+export function drawCards(
   session: BasicGameSession,
   playerId: PlayerId,
   count: number,
   random: () => number,
+  acquisitions?: AcquisitionJournal,
+  reason: DrawReason = "effect",
 ): void {
   const player = session.state.players[playerId];
+  const deckBefore = session.state.sharedDeck.length;
+  const received: DrawnCard[] = [];
   let drawn = 0;
   for (let i = 0; i < count; i += 1) {
-    if (session.state.sharedDeck.length === 0) recycleDiscards(session, random);
+    const recycledBefore = session.state.sharedDeck.length === 0 ? recycleDiscards(session, random) : 0;
     const cardId = session.state.sharedDeck.pop();
     if (!cardId) break;
+    const handIndexAtReceipt = player.hand.length;
     player.hand.push(cardId);
+    received.push({ cardId, handIndexAtReceipt, recycledBefore, deckRemaining: session.state.sharedDeck.length });
     drawn += 1;
   }
   if (drawn > 0) log(session, `${playerName(playerId)}摸了 ${drawn} 张牌。`);
+  acquisitions?.record({ kind: "draw", playerId, reason, requested: count, deckBefore,
+    deckAfter: session.state.sharedDeck.length, cards: received });
 }
 
-function recycleDiscards(session: BasicGameSession, random: () => number): void {
+function recycleDiscards(session: BasicGameSession, random: () => number): number {
   const recycled = [
     ...session.state.players.P1.discardPile,
     ...session.state.players.P2.discardPile,
@@ -513,6 +524,7 @@ function recycleDiscards(session: BasicGameSession, random: () => number): void 
   shuffle(recycled, random);
   session.state.sharedDeck.push(...recycled);
   if (recycled.length > 0) log(session, `共享牌库抽空，临时规则将双方弃牌堆合并洗回，共 ${recycled.length} 张。`);
+  return recycled.length;
 }
 
 function validateAttacker(

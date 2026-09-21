@@ -1,7 +1,13 @@
+import { AcquisitionJournal, type CardAcquisition } from '../core/card-acquisition.js';
 import type { BasicGameSession } from "../core/basic-game.js";
 
 export type ChangeReason = "command" | "new-game" | "external";
-export type SessionListener = (reason: ChangeReason) => void;
+export interface SessionCommit {
+  reason: ChangeReason; gameId: string; revision: number;
+  /** Results of this commit only. Never copied into the session or persistence. */
+  acquisitions: CardAcquisition[];
+}
+export type SessionListener = (reason: ChangeReason, commit: SessionCommit) => void;
 
 /** One owner. Commands mutate drafts, and an error cannot commit a partial turn. */
 export class GameStore {
@@ -20,16 +26,19 @@ export class GameStore {
     return () => this.listeners.delete(listener);
   }
 
-  dispatch(reduce: (draft: BasicGameSession) => string | null): string | null {
+  dispatch(reduce: (draft: BasicGameSession, acquisitions: AcquisitionJournal) => string | null): string | null {
     if (this.notifying) return "状态正在同步，请稍后再试。";
     const draft = this.read();
-    const error = reduce(draft);
+    const acquisitions = new AcquisitionJournal();
+    const error = reduce(draft, acquisitions);
     if (error) return error;
-    this.commit(draft, "command");
+    this.commit(draft, "command", acquisitions.read());
     return null;
   }
 
-  replace(next: BasicGameSession): void { this.commit(structuredClone(next), "new-game"); }
+  replace(next: BasicGameSession, acquisitions: CardAcquisition[] = []): void {
+    this.commit(structuredClone(next), "new-game", structuredClone(acquisitions));
+  }
 
   acceptExternal(next: BasicGameSession): boolean {
     if (next.updatedAt <= this.state.updatedAt) return false;
@@ -45,7 +54,7 @@ export class GameStore {
     this.dirty = false;
   }
 
-  private commit(draft: BasicGameSession, reason: ChangeReason): void {
+  private commit(draft: BasicGameSession, reason: ChangeReason, acquisitions: CardAcquisition[] = []): void {
     draft.revision = (this.state.revision ?? 0) + 1;
     const previous = Date.parse(this.state.updatedAt);
     draft.updatedAt = new Date(Math.max(Date.now(), Number.isFinite(previous) ? previous + 1 : 0)).toISOString();
@@ -54,14 +63,17 @@ export class GameStore {
     // Storage failures do not roll back a valid move. The adapter reports them;
     // the store retains a dirty snapshot for the next explicit flush.
     try { this.flush(); } catch { /* Keep the dirty flag. */ }
-    this.notify(reason);
+    this.notify(reason, acquisitions);
   }
 
-  private notify(reason: ChangeReason): void {
+  private notify(reason: ChangeReason, acquisitions: CardAcquisition[] = []): void {
     this.notifying = true;
     try {
       for (const listener of this.listeners) {
-        try { listener(reason); }
+        // Each observer gets an isolated result; one subscriber cannot corrupt
+        // another subscriber's receipts or the authoritative snapshot.
+        try { listener(reason, { reason, gameId: this.state.gameId,
+          revision: this.state.revision ?? 0, acquisitions: structuredClone(acquisitions) }); }
         catch (error) { console.error("Session subscriber failed after commit", error); }
       }
     }
